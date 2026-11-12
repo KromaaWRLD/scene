@@ -5,13 +5,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>scene</title>
-
 <style>
 :root {
-  --rail: #202225;
+  --rail: #1e1f22;
   --sidebar: #232428;
   --main: #2b2d31;
-  --hover: #393b42;
   --selected: #404249;
   --text: #f2f3f5;
   --muted: #b5bac1;
@@ -19,6 +17,8 @@
   --line: #3b3d43;
   --purple: #7289da;
   --green: #3ba55c;
+  --header-height: 82px;
+  --account-height: 99px;
 }
 
 * {
@@ -43,21 +43,18 @@ body {
 
 svg {
   display: block;
+  flex-shrink: 0;
 }
 
 .app {
   height: 100vh;
-  min-height: 540px;
+  min-height: 480px;
   display: grid;
-  grid-template-columns: 108px 291px minmax(0, 1fr) 328px;
-}
-
-/* OFFICIAL SCENE LOGO */
-
-.scene-logo {
-  width: 36px;
-  height: 44px;
-  flex-shrink: 0;
+  grid-template-columns:
+    clamp(64px, 7.91vw, 108px)
+    clamp(220px, 21.32vw, 291px)
+    minmax(0, 1fr)
+    clamp(245px, 23.96vw, 328px);
 }
 
 /* SERVER RAIL */
@@ -71,11 +68,16 @@ svg {
 }
 
 .home-tile {
-  height: 82px;
+  height: var(--header-height);
   width: 100%;
   display: grid;
   place-items: center;
   border-bottom: 1px solid #191a1d;
+}
+
+.scene-logo {
+  width: 30px;
+  height: 36px;
 }
 
 .server-plus {
@@ -83,14 +85,14 @@ svg {
   margin-bottom: 19px;
   width: 64px;
   height: 64px;
-  background: #303238;
   border-radius: 8px;
+  background: #303238;
   display: grid;
   place-items: center;
   color: #b9bbbe;
 }
 
-/* DIRECT MESSAGE SIDEBAR */
+/* DM SIDEBAR */
 
 .dm-sidebar {
   background: var(--sidebar);
@@ -101,8 +103,8 @@ svg {
 }
 
 .sidebar-heading {
-  height: 82px;
-  min-height: 82px;
+  height: var(--header-height);
+  min-height: var(--header-height);
   padding: 0 27px;
   display: flex;
   align-items: center;
@@ -139,12 +141,12 @@ svg {
 }
 
 .side-item svg {
-  width: 27px;
-  height: 27px;
+  width: 25px;
+  height: 25px;
 }
 
 .dm-heading {
-  margin-top: 41px;
+  margin-top: 34px;
   padding: 0 25px;
   height: 32px;
   display: flex;
@@ -167,8 +169,8 @@ svg {
 
 .account-bar {
   margin-top: auto;
-  height: 99px;
-  min-height: 99px;
+  height: var(--account-height);
+  min-height: var(--account-height);
   border-top: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -214,11 +216,11 @@ svg {
 }
 
 .account-tools svg {
-  width: 23px;
-  height: 23px;
+  width: 21px;
+  height: 21px;
 }
 
-/* TOP HEADER */
+/* MAIN PANEL */
 
 .main-panel {
   display: flex;
@@ -228,15 +230,20 @@ svg {
 }
 
 .topbar {
-  height: 82px;
-  min-height: 82px;
+  height: var(--header-height);
+  min-height: var(--header-height);
   display: flex;
   align-items: center;
-  gap: 17px;
+  gap: clamp(7px, 1.25vw, 17px);
   padding: 0 25px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
   overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topbar::-webkit-scrollbar {
+  display: none;
 }
 
 .page-title {
@@ -250,14 +257,14 @@ svg {
 }
 
 .page-title svg {
-  width: 27px;
-  height: 27px;
+  width: 25px;
+  height: 25px;
   color: #b8bbc6;
 }
 
 .tab {
   color: #b7bbc7;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   padding: 9px 13px;
   border-radius: 6px;
@@ -279,7 +286,7 @@ svg {
   background: #4a4c55;
 }
 
-/* FRIENDS EMPTY STATE */
+/* CENTER FRIENDS CONTENT */
 
 .friends-content {
   flex: 1;
@@ -287,28 +294,32 @@ svg {
   place-items: center;
   min-height: 0;
   overflow: hidden;
-  padding: 25px;
+  padding: 24px;
 }
 
 .empty-state {
   width: 100%;
-  max-width: 690px;
+  max-width: 560px;
   text-align: center;
-  transform: translateY(-5px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
 }
 
 .illustration {
   position: relative;
-  width: 100%;
-  max-width: 580px;
-  margin: 0 auto 15px;
+  width: min(100%, 440px);
+  aspect-ratio: 512 / 350;
+  margin: 0 auto 13px;
 }
 
 .cloud-art {
   position: absolute;
   left: 2%;
-  bottom: 4%;
+  bottom: 3%;
   width: 96%;
+  height: auto;
   z-index: 0;
 }
 
@@ -316,20 +327,23 @@ svg {
   position: relative;
   z-index: 1;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
   display: block;
 }
 
 .empty-title {
   color: white;
   font-size: 20px;
+  line-height: 1.3;
   font-weight: 750;
-  margin: 8px 0;
+  margin: 5px 0;
 }
 
 .empty-description {
   color: #aeb2bf;
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 /* ACTIVE NOW */
@@ -338,45 +352,52 @@ svg {
   background: var(--main);
   border-left: 1px solid var(--line);
   padding: 24px 23px;
+  min-width: 0;
 }
 
 .activity-title {
   margin: 0;
   color: #f2f3f5;
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 750;
 }
 
 .activity-empty {
   text-align: center;
-  margin-top: 70px;
+  margin-top: 67px;
   padding: 0 8px;
 }
 
 .activity-caption {
   color: white;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   margin-bottom: 9px;
 }
 
 .activity-copy {
   color: #aeb2bf;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
-/* RESPONSIVE */
+/* SMALLER DESKTOP */
 
-@media(max-width: 1200px) {
+@media(max-width: 1100px) {
   .app {
-    grid-template-columns: 78px 245px minmax(0, 1fr);
+    grid-template-columns: 72px 240px minmax(0, 1fr);
   }
 
   .activity-panel {
     display: none;
   }
+
+  .illustration {
+    width: min(100%, 390px);
+  }
 }
+
+/* TABLET */
 
 @media(max-width: 760px) {
   .app {
@@ -396,18 +417,53 @@ svg {
     font-size: 13px;
     padding: 8px;
   }
+
+  .page-title {
+    font-size: 17px;
+    margin-right: 0;
+  }
+
+  .friends-content {
+    padding: 12px;
+  }
+
+  .illustration {
+    width: min(100%, 340px);
+  }
+
+  .empty-title {
+    font-size: 17px;
+  }
+
+  .empty-description {
+    font-size: 13px;
+  }
+}
+
+/* SHORT WINDOWS */
+
+@media(max-height: 620px) {
+  :root {
+    --header-height: 64px;
+    --account-height: 76px;
+  }
+
+  .illustration {
+    width: min(100%, 340px);
+  }
+
+  .activity-empty {
+    margin-top: 42px;
+  }
 }
 </style>
 </head>
 
 <body>
-
 <div class="app">
 
 <!-- SERVER RAIL -->
-
 <aside class="server-rail">
-
   <div class="home-tile">
     <svg class="scene-logo" viewBox="0 0 40 48"
          xmlns="http://www.w3.org/2000/svg">
@@ -416,23 +472,20 @@ svg {
     </svg>
   </div>
 
-  <div class="server-plus" aria-label="Add server">
-    <svg width="27" height="27" viewBox="0 0 24 24"
+  <div class="server-plus">
+    <svg width="25" height="25" viewBox="0 0 24 24"
          fill="none" stroke="currentColor"
          stroke-width="2.2" stroke-linecap="round">
       <path d="M12 4v16M4 12h16"/>
     </svg>
   </div>
-
 </aside>
 
 <!-- DM SIDEBAR -->
-
 <aside class="dm-sidebar">
 
   <header class="sidebar-heading">
     <span>scene</span>
-
     <svg class="dropdown" width="17" height="17"
          viewBox="0 0 24 24" fill="none"
          stroke="currentColor" stroke-width="2.5"
@@ -442,28 +495,19 @@ svg {
   </header>
 
   <nav class="side-nav">
-
     <div class="side-item selected">
-
-      <!-- Friends icon -->
-      <svg viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="1.8"
-           stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="9" cy="8" r="3.3" fill="currentColor" stroke="none"/>
-        <path d="M2.5 19v-1.5a6.5 6.5 0 0 1 13 0V19Z"
-              fill="currentColor" stroke="none"/>
-        <circle cx="17.2" cy="7.3" r="2.7" fill="currentColor" stroke="none"/>
-        <path d="M16.5 12.5c3.2 0 5 2 5 4.5v1.5h-3.8"/>
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="9" cy="8" r="3.3"/>
+        <path d="M2.5 19v-1.5a6.5 6.5 0 0 1 13 0V19Z"/>
+        <circle cx="17.2" cy="7.3" r="2.7"/>
+        <path d="M16.5 12.5c3.2 0 5 2 5 4.5V19h-3.8"/>
       </svg>
-
       Friends
     </div>
-
   </nav>
 
   <div class="dm-heading">
     <span>DIRECT MESSAGES</span>
-
     <svg width="20" height="20" viewBox="0 0 24 24"
          fill="none" stroke="currentColor"
          stroke-width="2" stroke-linecap="round">
@@ -472,14 +516,10 @@ svg {
   </div>
 
   <div class="dm-empty">
-    No direct messages<br>
-    at this time.
+    No direct messages<br>at this time.
   </div>
 
-  <!-- USER PANEL -->
-
   <footer class="account-bar">
-
     <div class="account-avatar">U</div>
 
     <div class="account-info">
@@ -488,16 +528,15 @@ svg {
     </div>
 
     <div class="account-tools">
-
       <!-- Mute -->
       <svg viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="1.8"
            stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 18a4 4 0 0 0 4-4V9"/>
-        <path d="M8 14V9a4 4 0 0 1 7-2.6"/>
-        <path d="M5 11v3a7 7 0 0 0 12.8 3.8"/>
+        <path d="M9 9a3 3 0 0 1 6 0v4"/>
+        <path d="M5 11v2a7 7 0 0 0 12 4.8"/>
+        <path d="M19 11v2"/>
         <path d="m3 3 18 18"/>
-        <path d="m9 21 3 0"/>
+        <path d="M10 21h4"/>
       </svg>
 
       <!-- Headphones -->
@@ -509,70 +548,55 @@ svg {
         <path d="M21 13h-4v7h2a2 2 0 0 0 2-2Z"/>
       </svg>
 
-      <!-- Settings gear -->
+      <!-- Settings -->
       <svg viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="1.8"
            stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
-        <path d="m19.4 15 .1.1 1.4 1.1-1.5 2.6-1.7-.7a8 8 0 0 1-1.8 1l-.3 1.9h-3l-.3-1.9a8 8 0 0 1-1.8-1l-1.7.7-1.5-2.6 1.4-1.1a8 8 0 0 1 0-2l-1.4-1.1 1.5-2.6 1.7.7a8 8 0 0 1 1.8-1l.3-1.9h3l.3 1.9a8 8 0 0 1 1.8 1l1.7-.7 1.5 2.6-1.4 1.1a8 8 0 0 1 0 2Z"
-              transform="translate(-0.5 -0.5)"/>
+        <path d="m19 13 2 1-2 4-2-1-2 1v2h-5v-2l-2-1-2 1-2-4 2-1v-2l-2-1 2-4 2 1 2-1V4h5v2l2 1 2-1 2 4-2 1Z"
+              transform="translate(0 1)"/>
       </svg>
-
     </div>
-
   </footer>
-
 </aside>
 
 <!-- MAIN FRIENDS VIEW -->
-
 <main class="main-panel">
 
   <header class="topbar">
-
     <div class="page-title">
-
       <svg viewBox="0 0 24 24" fill="currentColor">
         <circle cx="9" cy="8" r="3.5"/>
         <path d="M2 19v-1.5a7 7 0 0 1 14 0V19Z"/>
         <circle cx="17.5" cy="7.5" r="3"/>
         <path d="M16 13c3.8 0 6 2.1 6 5v1h-3.8"/>
       </svg>
-
       Friends
-
     </div>
 
     <div class="tab current">Online</div>
     <div class="tab">All</div>
     <div class="tab">Pending</div>
     <div class="tab">Blocked</div>
-
     <div class="tab-separator"></div>
-
     <div class="tab add-friend">Add Friend</div>
-
   </header>
 
   <section class="friends-content">
-
     <div class="empty-state">
 
       <div class="illustration">
 
-        <!-- Background cloud -->
         <svg class="cloud-art" viewBox="0 0 700 240">
           <path d="M65 192c-37 0-57-21-57-48 0-28 23-49 51-49 7-51 48-83 96-70 26-42 82-53 121-22 35-23 91-14 114 22 48-9 91 22 95 69 32 2 55 23 55 51 0 29-24 47-59 47H65Z"
                 fill="#454750" opacity=".58"/>
         </svg>
 
-        <!-- Your actual mascot SVG -->
         <img
           class="mascot-art"
           src="scene-mascot.svg"
           alt="scene mascot"
         >
-
       </div>
 
       <div class="empty-title">
@@ -582,33 +606,24 @@ svg {
       <div class="empty-description">
         When your friends are online, you'll see them here.
       </div>
-
     </div>
-
   </section>
 
 </main>
 
 <!-- ACTIVE NOW -->
-
 <aside class="activity-panel">
-
   <h2 class="activity-title">Active Now</h2>
 
   <div class="activity-empty">
-
     <div class="activity-caption">
       It's quiet for now...
     </div>
 
     <div class="activity-copy">
-      When a friend starts an activity —
-      like playing a game or hanging out
-      on voice — we'll show it here!
+      When a friend starts an activity—like playing a game or hanging out on voice—we'll show it here!
     </div>
-
   </div>
-
 </aside>
 
 </div>
