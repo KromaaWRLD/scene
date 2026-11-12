@@ -1,532 +1,505 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scene UI Recreation</title>
+<title>scene</title>
 <style>
-    :root {
-        --bg-tertiary: #1e1f22;
-        --bg-secondary: #2b2d31;
-        --bg-primary: #313338;
-        --bg-secondary-alt: #232428;
-        --text-normal: #dbdee1;
-        --text-muted: #949ba4;
-        --interactive-normal: #b5bac1;
-        --interactive-hover: #dbdee1;
-        --interactive-active: #fff;
-        --brand: #6366f1; /* Purple accent */
-        --divider: rgba(255, 255, 255, 0.06);
-    }
+:root {
+  --rail:#1e1f22;
+  --sidebar:#232428;
+  --main:#2b2d31;
+  --selected:#404249;
+  --text:#f2f3f5;
+  --muted:#b5bac1;
+  --dim:#858995;
+  --line:#3f4147;
+  --purple:#7289da;
+}
+* {
+  box-sizing:border-box;
+  user-select:none;
+  -webkit-user-select:none;
+}
+html,body {
+  width:100%;height:100%;margin:0;
+}
+body {
+  overflow:hidden;
+  background:var(--main);
+  color:var(--text);
+  font:14px "Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+.app {
+  height:100vh;
+  min-height:560px;
+  display:grid;
+  grid-template-columns:108px 291px minmax(420px,1fr) 328px;
+}
 
-    * {
-        box-sizing: border-box;
-    }
+/* SERVER RAIL */
 
-    body, html {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        background-color: var(--bg-primary);
-        color: var(--text-normal);
-        overflow: hidden;
-    }
+.server-rail {
+  background:var(--rail);
+  border-right:1px solid #191a1d;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.home-tile {
+  height:82px;
+  width:100%;
+  display:grid;
+  place-items:center;
+  border-bottom:1px solid #191a1d;
+}
+.scene-logo {
+  width:55px;
+  height:55px;
+}
+.server-plus {
+  margin-top:auto;
+  margin-bottom:20px;
+  width:64px;
+  height:64px;
+  border-radius:9px;
+  background:#303238;
+  display:grid;
+  place-items:center;
+  color:#c3c6ce;
+  font-size:38px;
+  font-weight:300;
+}
 
-    .app-container {
-        display: flex;
-        height: 100vh;
-        width: 100vw;
-    }
+/* DM SIDEBAR */
 
-    /* Leftmost Server/App List */
-    .server-list {
-        width: 72px;
-        background-color: var(--bg-tertiary);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding-top: 12px;
-    }
+.dm-sidebar {
+  background:var(--sidebar);
+  border-right:1px solid #202126;
+  display:flex;
+  flex-direction:column;
+}
+.sidebar-heading {
+  height:82px;
+  min-height:82px;
+  padding:0 27px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid var(--line);
+  font-size:21px;
+  font-weight:750;
+  color:white;
+}
+.chevron {
+  color:#9298a8;
+  font-size:24px;
+}
+.side-nav {
+  padding:10px 14px 0;
+}
+.side-item {
+  height:64px;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  padding:0 19px;
+  border-radius:8px;
+  color:#c7c9d1;
+  font-size:18px;
+  font-weight:600;
+}
+.side-item.selected {
+  background:#3b3d49;
+  color:white;
+}
+.side-item svg {
+  width:30px;
+  height:30px;
+}
+.dm-heading {
+  margin-top:41px;
+  padding:0 25px;
+  height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  color:#9a9daa;
+  font-size:15px;
+  font-weight:750;
+}
+.dm-plus {
+  font-size:29px;
+  font-weight:300;
+  color:#aeb2c0;
+}
+.dm-empty {
+  padding:19px 25px;
+  text-align:center;
+  color:#858997;
+  font-size:16px;
+  line-height:1.65;
+}
 
-    .server-icon {
-        width: 48px;
-        height: 48px;
-        background-color: var(--bg-primary);
-        border-radius: 24px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 8px;
-        cursor: pointer;
-        transition: 0.2s ease;
-        position: relative;
-    }
+/* ACCOUNT BAR */
 
-    .server-icon:hover {
-        border-radius: 16px;
-    }
+.account-bar {
+  margin-top:auto;
+  height:99px;
+  min-height:99px;
+  border-top:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  gap:13px;
+  padding:0 19px;
+  background:#25262b;
+}
+.account-avatar {
+  width:52px;
+  height:52px;
+  background:#1b1c22;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+}
+.account-avatar svg {
+  width:44px;
+  height:44px;
+}
+.account-info {
+  flex:1;
+}
+.account-name {
+  font-size:16px;
+  font-weight:700;
+  color:white;
+}
+.account-tag {
+  color:#a6a9b4;
+  font-size:14px;
+}
+.account-tools {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  color:#aeb2bd;
+  font-size:23px;
+}
 
-    .server-icon.brand {
-        background-color: transparent;
-    }
+/* MAIN FRIENDS VIEW */
 
-    /* Left Sidebar */
-    .sidebar {
-        width: 240px;
-        background-color: var(--bg-secondary);
-        display: flex;
-        flex-direction: column;
-    }
+.main-panel {
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  background:var(--main);
+}
+.topbar {
+  height:82px;
+  min-height:82px;
+  display:flex;
+  align-items:center;
+  gap:27px;
+  padding:0 26px;
+  border-bottom:1px solid var(--line);
+  white-space:nowrap;
+  overflow-x:auto;
+}
+.page-title {
+  display:flex;
+  align-items:center;
+  gap:15px;
+  color:white;
+  font-size:22px;
+  font-weight:750;
+  margin-right:13px;
+}
+.page-title svg {
+  width:31px;
+  height:31px;
+  color:#b8bbc6;
+}
+.tab {
+  color:#b7bbc7;
+  font-size:18px;
+  font-weight:600;
+  padding:11px 17px;
+  border-radius:7px;
+}
+.tab.current {
+  color:white;
+  background:#41434c;
+}
+.tab.add-friend {
+  color:#8c78f4;
+  margin-left:2px;
+}
+.tab-separator {
+  height:35px;
+  width:1px;
+  background:#4a4c55;
+  margin:0 -7px;
+}
 
-    .sidebar-header {
-        height: 48px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 16px;
-        border-bottom: 1px solid var(--bg-tertiary);
-        cursor: pointer;
-        font-weight: 600;
-        color: var(--interactive-active);
-    }
+/* CENTER MASCOT */
 
-    .sidebar-content {
-        flex: 1;
-        padding: 8px;
-        overflow-y: auto;
-    }
+.friends-content {
+  flex:1;
+  display:grid;
+  place-items:center;
+  min-height:0;
+  overflow:hidden;
+  padding:24px;
+}
+.empty-state {
+  width:min(100%,740px);
+  text-align:center;
+  transform:translateY(-7px);
+}
+.illustration {
+  position:relative;
+  width:min(100%,690px);
+  margin:0 auto 12px;
+}
+.cloud-art {
+  position:absolute;
+  left:3%;
+  bottom:5%;
+  width:94%;
+  height:auto;
+  z-index:0;
+}
+.mascot-art {
+  position:relative;
+  z-index:1;
+  width:100%;
+  height:auto;
+  display:block;
+}
+.empty-title {
+  color:#f2f3f5;
+  font-size:25px;
+  font-weight:750;
+  margin:8px 0;
+}
+.empty-description {
+  color:#aeb2bf;
+  font-size:19px;
+}
 
-    .nav-item {
-        display: flex;
-        align-items: center;
-        padding: 10px 12px;
-        border-radius: 4px;
-        color: var(--interactive-active);
-        background-color: rgba(255,255,255,0.08);
-        cursor: pointer;
-        margin-bottom: 16px;
-        font-weight: 500;
-    }
+/* ACTIVE NOW */
 
-    .nav-item svg {
-        margin-right: 12px;
-        fill: currentColor;
-    }
+.activity-panel {
+  background:var(--main);
+  border-left:1px solid var(--line);
+  padding:24px 23px;
+}
+.activity-title {
+  margin:0;
+  color:#f2f3f5;
+  font-size:24px;
+  font-weight:750;
+}
+.activity-empty {
+  text-align:center;
+  margin-top:73px;
+}
+.sleepy-mascot {
+  width:190px;
+  height:125px;
+  margin:0 auto 20px;
+  display:block;
+}
+.activity-caption {
+  color:white;
+  font-size:18px;
+  font-weight:700;
+  margin-bottom:9px;
+}
+.activity-copy {
+  color:#aeb2bf;
+  font-size:16px;
+  line-height:1.55;
+}
 
-    .dm-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 18px 8px 4px 8px;
-        color: var(--text-muted);
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.2px;
-    }
+/* RESPONSIVE */
 
-    .empty-dms {
-        text-align: center;
-        color: var(--text-muted);
-        font-size: 13px;
-        margin-top: 16px;
-        line-height: 1.4;
-    }
-
-    /* User Panel (Bottom Left) */
-    .user-panel {
-        height: 52px;
-        background-color: var(--bg-secondary-alt);
-        display: flex;
-        align-items: center;
-        padding: 0 8px;
-    }
-
-    .user-avatar {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background-color: var(--brand);
-        margin-right: 8px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        flex-shrink: 0;
-    }
-
-    .user-info {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        font-size: 12px;
-        overflow: hidden;
-    }
-
-    .user-name {
-        font-weight: 600;
-        color: #fff;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        overflow: hidden;
-    }
-
-    .user-tag {
-        color: var(--text-muted);
-        font-size: 11px;
-    }
-
-    .user-controls {
-        display: flex;
-    }
-
-    .control-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 4px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        color: var(--interactive-normal);
-        cursor: pointer;
-    }
-
-    .control-btn:hover {
-        background-color: rgba(255,255,255,0.1);
-        color: var(--interactive-hover);
-    }
-
-    /* Main Content Area */
-    .main-content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        background-color: var(--bg-primary);
-    }
-
-    .top-bar {
-        height: 48px;
-        display: flex;
-        align-items: center;
-        padding: 0 16px;
-        border-bottom: 1px solid var(--bg-tertiary);
-    }
-
-    .top-bar-title {
-        display: flex;
-        align-items: center;
-        color: #fff;
-        font-weight: 600;
-        margin-right: 16px;
-        font-size: 15px;
-    }
-
-    .top-bar-title svg {
-        margin-right: 8px;
-        fill: var(--text-muted);
-    }
-
-    .top-bar-divider {
-        width: 1px;
-        height: 24px;
-        background-color: var(--divider);
-        margin: 0 16px;
-    }
-
-    .top-bar-tabs {
-        display: flex;
-        align-items: center;
-    }
-
-    .top-bar-tab {
-        padding: 4px 8px;
-        border-radius: 4px;
-        margin-right: 16px;
-        color: var(--interactive-normal);
-        font-weight: 500;
-        cursor: pointer;
-        font-size: 15px;
-    }
-
-    .top-bar-tab.active {
-        background-color: rgba(255,255,255,0.1);
-        color: #fff;
-    }
-
-    .top-bar-tab:hover:not(.active) {
-        background-color: rgba(255,255,255,0.05);
-        color: var(--interactive-hover);
-    }
-
-    .add-friend-btn {
-        color: var(--brand);
-        padding: 4px 8px;
-        font-weight: 500;
-        cursor: pointer;
-        font-size: 15px;
-    }
-
-    /* Empty State (Center Graphic) */
-    .empty-state {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        position: relative;
-    }
-
-    /* Decorative background blobs to mimic the image */
-    .bg-blob {
-        position: absolute;
-        width: 600px;
-        height: 500px;
-        background: radial-gradient(circle, rgba(0,0,0,0.4) 0%, transparent 60%);
-        z-index: 0;
-    }
-
-    .graphic-container {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-
-    /* Approximating the character with SVG */
-    .character-svg {
-        width: 250px;
-        height: 200px;
-        margin-bottom: 30px;
-    }
-
-    .empty-text {
-        text-align: center;
-        z-index: 1;
-    }
-
-    .empty-text h2 {
-        color: var(--text-normal);
-        font-size: 16px;
-        margin: 0 0 8px 0;
-        font-weight: 600;
-    }
-
-    .empty-text p {
-        color: var(--text-muted);
-        font-size: 14px;
-        margin: 0;
-    }
-
-    /* Right Sidebar (Active Now) */
-    .right-sidebar {
-        width: 360px;
-        background-color: var(--bg-secondary);
-        border-left: 1px solid var(--bg-tertiary);
-        padding: 24px 16px;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .right-header {
-        font-size: 20px;
-        font-weight: 700;
-        color: #fff;
-        margin-bottom: 24px;
-    }
-
-    .active-empty {
-        text-align: center;
-        margin-top: 40px;
-    }
-    
-    .cat-icon-svg {
-        width: 80px;
-        height: 80px;
-        fill: var(--bg-tertiary);
-        margin-bottom: 20px;
-    }
-
-    .active-empty h3 {
-        color: var(--text-normal);
-        font-size: 16px;
-        margin: 0 0 8px 0;
-        font-weight: 600;
-    }
-
-    .active-empty p {
-        color: var(--text-muted);
-        font-size: 13px;
-        line-height: 1.4;
-        margin: 0;
-        padding: 0 16px;
-    }
-
+@media(max-width:1250px) {
+  .app {
+    grid-template-columns:78px 245px minmax(360px,1fr) 260px;
+  }
+  .topbar {
+    gap:14px;
+    padding:0 18px;
+  }
+  .tab {
+    padding:9px 11px;
+    font-size:15px;
+  }
+}
+@media(max-width:950px) {
+  .app {
+    grid-template-columns:66px 220px minmax(300px,1fr);
+  }
+  .activity-panel {
+    display:none;
+  }
+}
+@media(max-width:650px) {
+  .app {
+    grid-template-columns:58px minmax(0,1fr);
+  }
+  .dm-sidebar {
+    display:none;
+  }
+  .topbar {
+    padding:0 10px;
+    gap:7px;
+  }
+  .tab {
+    font-size:13px;
+    padding:7px 9px;
+  }
+  .empty-title {
+    font-size:18px;
+  }
+  .empty-description {
+    font-size:14px;
+  }
+}
 </style>
 </head>
+
 <body>
+<div class="app">
 
-<div class="app-container">
-    
-    <!-- Server/App List Column -->
-    <div class="server-list">
-        <div class="server-icon brand">
-            <!-- Brand Logo Approximation -->
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 28C10 24 14 16 20 16C26 16 30 24 28 28C26 32 14 32 12 28Z" fill="#6366f1"/>
-                <path d="M28 12C30 16 26 24 20 24C14 24 10 16 12 12C14 8 26 8 28 12Z" fill="#4f46e5"/>
-            </svg>
-        </div>
-        <!-- Spacer/Divider -->
-        <div style="width: 32px; height: 2px; background: var(--bg-secondary); margin-bottom: 8px; border-radius: 1px;"></div>
+<!-- SERVER RAIL -->
+<aside class="server-rail">
+  <div class="home-tile">
+    <svg class="scene-logo" viewBox="0 0 40 48">
+      <path d="M34 4H19C11 4 6 10 6 18V24H25C28 24 29 27 26 29L6 44H21C29 44 34 38 34 30V24H15C12 24 11 21 14 19L34 4Z" fill="#7289da"/>
+    </svg>
+  </div>
+  <div class="server-plus">+</div>
+</aside>
+
+<!-- LEFT SIDEBAR -->
+<aside class="dm-sidebar">
+
+  <header class="sidebar-heading">
+    <span>scene</span>
+    <span class="chevron">⌄</span>
+  </header>
+
+  <nav class="side-nav">
+    <div class="side-item selected">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
+      </svg>
+      Friends
+    </div>
+  </nav>
+
+  <div class="dm-heading">
+    <span>DIRECT MESSAGES</span>
+    <span class="dm-plus">+</span>
+  </div>
+
+  <div class="dm-empty">
+    No direct messages<br>at this time.
+  </div>
+
+  <footer class="account-bar">
+    <div class="account-avatar">
+      <svg viewBox="0 0 40 48">
+        <path d="M34 4H19C11 4 6 10 6 18V24H25C28 24 29 27 26 29L6 44H21C29 44 34 38 34 30V24H15C12 24 11 21 14 19L34 4Z" fill="#7289da"/>
+      </svg>
+    </div>
+    <div class="account-info">
+      <div class="account-name">User</div>
+      <div class="account-tag">#0000</div>
+    </div>
+    <div class="account-tools">
+      <span>♩</span><span>◖</span><span>⚙</span>
+    </div>
+  </footer>
+</aside>
+
+<!-- MAIN FRIENDS PAGE -->
+<main class="main-panel">
+
+  <header class="topbar">
+    <div class="page-title">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
+      </svg>
+      Friends
+    </div>
+    <div class="tab current">Online</div>
+    <div class="tab">All</div>
+    <div class="tab">Pending</div>
+    <div class="tab">Blocked</div>
+    <div class="tab-separator"></div>
+    <div class="tab add-friend">Add Friend</div>
+  </header>
+
+  <section class="friends-content">
+    <div class="empty-state">
+
+      <div class="illustration">
+
+        <svg class="cloud-art" viewBox="0 0 700 240">
+          <path d="M65 192c-37 0-57-21-57-48 0-28 23-49 51-49 7-51 48-83 96-70 26-42 82-53 121-22 35-23 91-14 114 22 48-9 91 22 95 69 32 2 55 23 55 51 0 29-24 47-59 47H65Z" fill="#454750" opacity=".58"/>
+        </svg>
+
+        <!-- YOUR UPLOADED VECTOR MASCOT -->
+        <img
+          class="mascot-art"
+          src="scene-mascot.svg"
+          alt="Gray scene mascot using a laptop"
+        >
+
+      </div>
+
+      <div class="empty-title">
+        No friends online right now.
+      </div>
+
+      <div class="empty-description">
+        When your friends are online, you'll see them here.
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<!-- RIGHT PANEL -->
+<aside class="activity-panel">
+
+  <h2 class="activity-title">Active Now</h2>
+
+  <div class="activity-empty">
+
+    <svg class="sleepy-mascot" viewBox="0 0 190 125">
+      <ellipse cx="95" cy="105" rx="79" ry="9" fill="#454750" opacity=".65"/>
+      <path d="M35 87c-8-23 3-41 22-47L67 18q4-10 14-4l20 17 21-17q10-7 16 5l10 22q18 13 12 42-5 24-32 25H65Q42 108 35 87Z" fill="#777b84" stroke="#202225" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M64 73q8 12 17 0M111 73q8 12 17 0" fill="none" stroke="#292b31" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="96" cy="82" r="3" fill="#292b31"/>
+      <path d="M154 24l9-11m-2 21 12-4m-12 17 8 3" stroke="#858995" stroke-width="4" stroke-linecap="round"/>
+    </svg>
+
+    <div class="activity-caption">
+      It's quiet for now...
     </div>
 
-    <!-- Navigation Sidebar -->
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <span>scene</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
-        </div>
-        
-        <div class="sidebar-content">
-            <div class="nav-item">
-                <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                Friends
-            </div>
-            
-            <div class="dm-header">
-                <span>Direct Messages</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-            </div>
-            
-            <div class="empty-dms">
-                No direct messages<br>at this time.
-            </div>
-        </div>
-        
-        <!-- User Profile Bottom Bar -->
-        <div class="user-panel">
-            <div class="user-avatar">
-                 <svg width="20" height="20" viewBox="0 0 40 40" fill="none"><path d="M12 28C10 24 14 16 20 16C26 16 30 24 28 28C26 32 14 32 12 28Z" fill="#fff"/></svg>
-            </div>
-            <div class="user-info">
-                <span class="user-name">User</span>
-                <span class="user-tag">#0000</span>
-            </div>
-            <div class="user-controls">
-                <div class="control-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
-                </div>
-                <div class="control-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                </div>
-                <div class="control-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
-                </div>
-            </div>
-        </div>
-    </div>
+    <p class="activity-copy">
+      When a friend starts an activity—like playing a game or hanging out on voice—we'll show it here!
+    </p>
 
-    <!-- Main Content -->
-    <div class="main-content">
-        <div class="top-bar">
-            <div class="top-bar-title">
-                <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                Friends
-            </div>
-            
-            <div class="top-bar-divider"></div>
-            
-            <div class="top-bar-tabs">
-                <div class="top-bar-tab active">Online</div>
-                <div class="top-bar-tab">All</div>
-                <div class="top-bar-tab">Pending</div>
-                <div class="top-bar-tab">Blocked</div>
-            </div>
-            
-            <div class="top-bar-divider" style="margin: 0 16px 0 0;"></div>
-            
-            <div class="add-friend-btn">Add Friend</div>
-        </div>
-
-        <div class="empty-state">
-            <div class="bg-blob"></div>
-            
-            <div class="graphic-container">
-                <!-- Abstract character representation matching the cat-like creature with laptop -->
-                <svg class="character-svg" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Clouds / Background elements -->
-                    <circle cx="40" cy="90" r="30" fill="#404249" />
-                    <circle cx="160" cy="100" r="25" fill="#404249" />
-                    <circle cx="100" cy="80" r="45" fill="#404249" />
-                    
-                    <!-- Stars -->
-                    <path d="M 50 40 L 53 47 L 60 50 L 53 53 L 50 60 L 47 53 L 40 50 L 47 47 Z" fill="#b5bac1" />
-                    <path d="M 150 70 L 152 74 L 156 76 L 152 78 L 150 82 L 148 78 L 144 76 L 148 74 Z" fill="#b5bac1" />
-
-                    <!-- Character Body -->
-                    <path d="M 75 130 C 70 80, 130 80, 125 130 Z" fill="#6366f1" />
-                    
-                    <!-- Ears -->
-                    <path d="M 75 90 L 85 60 L 95 80 Z" fill="#6366f1" />
-                    <path d="M 125 90 L 115 60 L 105 80 Z" fill="#6366f1" />
-
-                    <!-- Face mask (white) -->
-                    <ellipse cx="100" cy="95" rx="18" ry="14" fill="#ffffff" />
-                    <!-- Eyes -->
-                    <circle cx="92" cy="95" r="3" fill="#1e1f22" />
-                    <circle cx="108" cy="95" r="3" fill="#1e1f22" />
-
-                    <!-- Hoodie / Arms -->
-                    <path d="M 60 130 C 60 110, 80 100, 95 115 Z" fill="#1e1f22" />
-                    <path d="M 140 130 C 140 110, 120 100, 105 115 Z" fill="#1e1f22" />
-
-                    <!-- Laptop -->
-                    <rect x="70" y="115" width="50" height="30" rx="3" fill="#313338" />
-                    <!-- Laptop Screen Glow/Logo -->
-                    <path d="M 88 125 C 85 122, 90 118, 95 120 C 100 122, 102 128, 95 130 C 90 132, 85 130, 88 125 Z" fill="#6366f1" />
-                    
-                    <!-- Floating message bubble -->
-                    <path d="M 140 50 C 140 30, 170 30, 170 50 C 170 65, 155 70, 145 75 C 148 70, 150 65, 140 65 Z" fill="#dbdee1" />
-                    <circle cx="150" cy="45" r="3" fill="#1e1f22" />
-                    <circle cx="160" cy="45" r="3" fill="#1e1f22" />
-                    <rect x="150" y="52" width="10" height="2" rx="1" fill="#1e1f22" />
-                </svg>
-            </div>
-
-            <div class="empty-text">
-                <h2>No friends online right now.</h2>
-                <p>When your friends are online, you'll see them here.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Active Now Right Sidebar -->
-    <div class="right-sidebar">
-        <div class="right-header">Active Now</div>
-        
-        <div class="active-empty">
-            <!-- Sleepy Cat SVG -->
-            <svg class="cat-icon-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                <path d="M 20 60 C 20 30, 80 30, 80 60 C 80 80, 20 80, 20 60 Z" fill="#2b2d31" stroke="#1e1f22" stroke-width="2"/>
-                <path d="M 20 60 L 10 35 L 35 45 Z" fill="#2b2d31" stroke="#1e1f22" stroke-width="2" />
-                <path d="M 80 60 L 90 35 L 65 45 Z" fill="#2b2d31" stroke="#1e1f22" stroke-width="2" />
-                
-                <!-- Sleepy Eyes -->
-                <path d="M 35 55 Q 40 60 45 55" fill="none" stroke="#404249" stroke-width="3" stroke-linecap="round"/>
-                <path d="M 55 55 Q 60 60 65 55" fill="none" stroke="#404249" stroke-width="3" stroke-linecap="round"/>
-                
-                <!-- Zzz -->
-                <text x="75" y="30" fill="#404249" font-family="sans-serif" font-weight="bold" font-size="12">Z</text>
-                <text x="85" y="20" fill="#404249" font-family="sans-serif" font-weight="bold" font-size="10">z</text>
-            </svg>
-            
-            <h3>It's quiet for now...</h3>
-            <p>When a friend starts an activity—like playing a game or hanging out on voice—we'll show it here!</p>
-        </div>
-    </div>
+  </div>
+</aside>
 
 </div>
-
 </body>
 </html>
