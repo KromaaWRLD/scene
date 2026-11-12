@@ -1,732 +1,532 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>scene</title>
-
+<title>Scene UI Recreation</title>
 <style>
-:root {
-  --darkest: #202225;
-  --sidebar: #2f3136;
-  --main: #36393f;
-  --hover: #393c43;
-  --selected: #42464d;
-  --text: #dcddde;
-  --white: #ffffff;
-  --muted: #8e9297;
-  --line: #292b2f;
-  --blurple: #7289da;
-  --green: #3ba55c;
-}
+    :root {
+        --bg-tertiary: #1e1f22;
+        --bg-secondary: #2b2d31;
+        --bg-primary: #313338;
+        --bg-secondary-alt: #232428;
+        --text-normal: #dbdee1;
+        --text-muted: #949ba4;
+        --interactive-normal: #b5bac1;
+        --interactive-hover: #dbdee1;
+        --interactive-active: #fff;
+        --brand: #6366f1; /* Purple accent */
+        --divider: rgba(255, 255, 255, 0.06);
+    }
 
-* {
-  box-sizing: border-box;
-  user-select: none;
-  -webkit-user-select: none;
-}
+    * {
+        box-sizing: border-box;
+    }
 
-html, body {
-  height: 100%;
-  margin: 0;
-}
+    body, html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-primary);
+        color: var(--text-normal);
+        overflow: hidden;
+    }
 
-body {
-  overflow: hidden;
-  background: var(--main);
-  color: var(--text);
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 14px;
-}
+    .app-container {
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+    }
 
-.app {
-  display: grid;
-  grid-template-columns: 72px 240px minmax(300px, 1fr) 240px;
-  height: 100vh;
-}
+    /* Leftmost Server/App List */
+    .server-list {
+        width: 72px;
+        background-color: var(--bg-tertiary);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 12px;
+    }
 
-/* SCENE LOGO */
+    .server-icon {
+        width: 48px;
+        height: 48px;
+        background-color: var(--bg-primary);
+        border-radius: 24px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: 0.2s ease;
+        position: relative;
+    }
 
-.scene-logo {
-  width: 40px;
-  height: 40px;
-  display: block;
-}
+    .server-icon:hover {
+        border-radius: 16px;
+    }
 
-.logo-path {
-  fill: var(--blurple);
-}
+    .server-icon.brand {
+        background-color: transparent;
+    }
 
-/* SERVER RAIL */
+    /* Left Sidebar */
+    .sidebar {
+        width: 240px;
+        background-color: var(--bg-secondary);
+        display: flex;
+        flex-direction: column;
+    }
 
-.rail {
-  background: var(--darkest);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12px 0;
-  gap: 8px;
-}
+    .sidebar-header {
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--bg-tertiary);
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--interactive-active);
+    }
 
-.home-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 9px;
-  background: var(--blurple);
-  display: grid;
-  place-items: center;
-}
+    .sidebar-content {
+        flex: 1;
+        padding: 8px;
+        overflow-y: auto;
+    }
 
-.home-icon .scene-logo {
-  width: 34px;
-  height: 34px;
-}
+    .nav-item {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 4px;
+        color: var(--interactive-active);
+        background-color: rgba(255,255,255,0.08);
+        cursor: pointer;
+        margin-bottom: 16px;
+        font-weight: 500;
+    }
 
-.rail-divider {
-  width: 32px;
-  height: 2px;
-  background: #36393f;
-  margin: 3px 0;
-}
+    .nav-item svg {
+        margin-right: 12px;
+        fill: currentColor;
+    }
 
-.add-server {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  background: #36393f;
-  color: #43b581;
-  display: grid;
-  place-items: center;
-  font-size: 28px;
-  font-weight: 300;
-  margin-top: auto;
-  margin-bottom: 5px;
-}
+    .dm-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 8px 4px 8px;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+    }
 
-/* LEFT SIDEBAR */
+    .empty-dms {
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 13px;
+        margin-top: 16px;
+        line-height: 1.4;
+    }
 
-.sidebar {
-  background: var(--sidebar);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
+    /* User Panel (Bottom Left) */
+    .user-panel {
+        height: 52px;
+        background-color: var(--bg-secondary-alt);
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+    }
 
-.sidebar-header {
-  height: 48px;
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--line);
-  color: white;
-  font-weight: 700;
-  font-size: 15px;
-}
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background-color: var(--brand);
+        margin-right: 8px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-shrink: 0;
+    }
 
-.chevron {
-  color: var(--muted);
-  font-size: 16px;
-}
+    .user-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        font-size: 12px;
+        overflow: hidden;
+    }
 
-.navigation {
-  padding: 10px 8px;
-}
+    .user-name {
+        font-weight: 600;
+        color: #fff;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+    }
 
-.nav-item {
-  height: 40px;
-  padding: 0 10px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-radius: 5px;
-  color: #b9bbbe;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 3px;
-}
+    .user-tag {
+        color: var(--text-muted);
+        font-size: 11px;
+    }
 
-.nav-item.active {
-  background: var(--selected);
-  color: white;
-}
+    .user-controls {
+        display: flex;
+    }
 
-.nav-item svg {
-  width: 21px;
-  height: 21px;
-}
+    .control-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: var(--interactive-normal);
+        cursor: pointer;
+    }
 
-.dm-heading {
-  padding: 14px 16px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #8e9297;
-  font-size: 11px;
-  font-weight: 700;
-}
+    .control-btn:hover {
+        background-color: rgba(255,255,255,0.1);
+        color: var(--interactive-hover);
+    }
 
-.plus {
-  font-size: 21px;
-  font-weight: 300;
-  color: #b9bbbe;
-}
+    /* Main Content Area */
+    .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--bg-primary);
+    }
 
-.dm-empty {
-  padding: 10px 18px;
-  color: #72767d;
-  font-size: 12px;
-  line-height: 1.6;
-}
+    .top-bar {
+        height: 48px;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--bg-tertiary);
+    }
 
-/* USER PANEL */
+    .top-bar-title {
+        display: flex;
+        align-items: center;
+        color: #fff;
+        font-weight: 600;
+        margin-right: 16px;
+        font-size: 15px;
+    }
 
-.user-panel {
-  height: 52px;
-  min-height: 52px;
-  margin-top: auto;
-  background: #292b2f;
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  gap: 8px;
-}
+    .top-bar-title svg {
+        margin-right: 8px;
+        fill: var(--text-muted);
+    }
 
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #5865a8;
-  display: grid;
-  place-items: center;
-  color: white;
-  font-weight: 700;
-}
+    .top-bar-divider {
+        width: 1px;
+        height: 24px;
+        background-color: var(--divider);
+        margin: 0 16px;
+    }
 
-.user-info {
-  flex: 1;
-  min-width: 0;
-  line-height: 1.3;
-}
+    .top-bar-tabs {
+        display: flex;
+        align-items: center;
+    }
 
-.user-name {
-  color: white;
-  font-weight: 700;
-  font-size: 13px;
-}
+    .top-bar-tab {
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin-right: 16px;
+        color: var(--interactive-normal);
+        font-weight: 500;
+        cursor: pointer;
+        font-size: 15px;
+    }
 
-.user-tag {
-  color: #b9bbbe;
-  font-size: 11px;
-}
+    .top-bar-tab.active {
+        background-color: rgba(255,255,255,0.1);
+        color: #fff;
+    }
 
-.user-button {
-  color: #b9bbbe;
-  width: 28px;
-  text-align: center;
-  font-size: 18px;
-}
+    .top-bar-tab:hover:not(.active) {
+        background-color: rgba(255,255,255,0.05);
+        color: var(--interactive-hover);
+    }
 
-/* MAIN CONTENT */
+    .add-friend-btn {
+        color: var(--brand);
+        padding: 4px 8px;
+        font-weight: 500;
+        cursor: pointer;
+        font-size: 15px;
+    }
 
-.main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  background: var(--main);
-}
+    /* Empty State (Center Graphic) */
+    .empty-state {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+    }
 
-.topbar {
-  height: 48px;
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  gap: 19px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--line);
-}
+    /* Decorative background blobs to mimic the image */
+    .bg-blob {
+        position: absolute;
+        width: 600px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(0,0,0,0.4) 0%, transparent 60%);
+        z-index: 0;
+    }
 
-.page-title {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 15px;
-  font-weight: 700;
-  color: white;
-  margin-right: 4px;
-}
+    .graphic-container {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
 
-.page-title svg {
-  width: 21px;
-  height: 21px;
-  color: #b9bbbe;
-}
+    /* Approximating the character with SVG */
+    .character-svg {
+        width: 250px;
+        height: 200px;
+        margin-bottom: 30px;
+    }
 
-.tab {
-  padding: 6px 9px;
-  border-radius: 5px;
-  color: #b9bbbe;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
+    .empty-text {
+        text-align: center;
+        z-index: 1;
+    }
 
-.tab.active {
-  background: var(--selected);
-  color: white;
-}
+    .empty-text h2 {
+        color: var(--text-normal);
+        font-size: 16px;
+        margin: 0 0 8px 0;
+        font-weight: 600;
+    }
 
-.tab.add-friend {
-  background: var(--green);
-  color: white;
-  padding: 6px 10px;
-  border-radius: 5px;
-}
+    .empty-text p {
+        color: var(--text-muted);
+        font-size: 14px;
+        margin: 0;
+    }
 
-/* EMPTY FRIENDS PAGE */
+    /* Right Sidebar (Active Now) */
+    .right-sidebar {
+        width: 360px;
+        background-color: var(--bg-secondary);
+        border-left: 1px solid var(--bg-tertiary);
+        padding: 24px 16px;
+        display: flex;
+        flex-direction: column;
+    }
 
-.content {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-}
+    .right-header {
+        font-size: 20px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 24px;
+    }
 
-.empty-state {
-  width: 100%;
-  text-align: center;
-  transform: translateY(-8px);
-}
+    .active-empty {
+        text-align: center;
+        margin-top: 40px;
+    }
+    
+    .cat-icon-svg {
+        width: 80px;
+        height: 80px;
+        fill: var(--bg-tertiary);
+        margin-bottom: 20px;
+    }
 
-.mascot {
-  width: 225px;
-  height: auto;
-  display: block;
-  margin: 0 auto 15px;
-}
+    .active-empty h3 {
+        color: var(--text-normal);
+        font-size: 16px;
+        margin: 0 0 8px 0;
+        font-weight: 600;
+    }
 
-.empty-title {
-  color: white;
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
+    .active-empty p {
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.4;
+        margin: 0;
+        padding: 0 16px;
+    }
 
-.empty-description {
-  color: #b9bbbe;
-  font-size: 13px;
-}
-
-/* ACTIVE NOW */
-
-.activity {
-  border-left: 1px solid var(--line);
-  background: var(--main);
-  padding: 18px 16px;
-}
-
-.activity-title {
-  color: white;
-  font-size: 15px;
-  font-weight: 700;
-  margin: 0 0 35px;
-}
-
-.activity-empty {
-  text-align: center;
-  padding: 0 7px;
-}
-
-.activity-empty strong {
-  color: white;
-  font-size: 14px;
-  display: block;
-  margin-bottom: 8px;
-}
-
-.activity-empty p {
-  color: #b9bbbe;
-  font-size: 12px;
-  line-height: 1.55;
-  margin: 0;
-}
-
-/* RESPONSIVE */
-
-@media(max-width: 950px) {
-  .app {
-    grid-template-columns: 64px 220px minmax(280px, 1fr);
-  }
-
-  .activity {
-    display: none;
-  }
-}
-
-@media(max-width: 620px) {
-  .app {
-    grid-template-columns: 56px minmax(0, 1fr);
-  }
-
-  .sidebar {
-    display: none;
-  }
-
-  .topbar {
-    gap: 7px;
-    padding: 0 10px;
-    overflow-x: auto;
-  }
-
-  .content {
-    padding: 10px;
-  }
-}
 </style>
 </head>
-
 <body>
 
-<div class="app">
-
-<!-- SERVER RAIL -->
-
-<aside class="rail">
-
-  <div class="home-icon">
-    <svg class="scene-logo" viewBox="0 0 40 48">
-      <path class="logo-path"
-        d="M34 4H19C11 4 6 10 6 18V24H25C28 24 29 27 26 29L6 44H21C29 44 34 38 34 30V24H15C12 24 11 21 14 19L34 4Z"/>
-    </svg>
-  </div>
-
-  <div class="rail-divider"></div>
-
-  <div class="add-server">+</div>
-
-</aside>
-
-<!-- DIRECT MESSAGES -->
-
-<aside class="sidebar">
-
-  <div class="sidebar-header">
-    <span>scene</span>
-    <span class="chevron">⌄</span>
-  </div>
-
-  <nav class="navigation">
-
-    <div class="nav-item active">
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
-      </svg>
-      Friends
+<div class="app-container">
+    
+    <!-- Server/App List Column -->
+    <div class="server-list">
+        <div class="server-icon brand">
+            <!-- Brand Logo Approximation -->
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 28C10 24 14 16 20 16C26 16 30 24 28 28C26 32 14 32 12 28Z" fill="#6366f1"/>
+                <path d="M28 12C30 16 26 24 20 24C14 24 10 16 12 12C14 8 26 8 28 12Z" fill="#4f46e5"/>
+            </svg>
+        </div>
+        <!-- Spacer/Divider -->
+        <div style="width: 32px; height: 2px; background: var(--bg-secondary); margin-bottom: 8px; border-radius: 1px;"></div>
     </div>
 
-  </nav>
-
-  <div class="dm-heading">
-    <span>DIRECT MESSAGES</span>
-    <span class="plus">+</span>
-  </div>
-
-  <div class="dm-empty">
-    No direct messages at this time.
-  </div>
-
-  <div class="user-panel">
-
-    <div class="user-avatar">U</div>
-
-    <div class="user-info">
-      <div class="user-name">User</div>
-      <div class="user-tag">#0000</div>
+    <!-- Navigation Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span>scene</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+        </div>
+        
+        <div class="sidebar-content">
+            <div class="nav-item">
+                <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                Friends
+            </div>
+            
+            <div class="dm-header">
+                <span>Direct Messages</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </div>
+            
+            <div class="empty-dms">
+                No direct messages<br>at this time.
+            </div>
+        </div>
+        
+        <!-- User Profile Bottom Bar -->
+        <div class="user-panel">
+            <div class="user-avatar">
+                 <svg width="20" height="20" viewBox="0 0 40 40" fill="none"><path d="M12 28C10 24 14 16 20 16C26 16 30 24 28 28C26 32 14 32 12 28Z" fill="#fff"/></svg>
+            </div>
+            <div class="user-info">
+                <span class="user-name">User</span>
+                <span class="user-tag">#0000</span>
+            </div>
+            <div class="user-controls">
+                <div class="control-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+                </div>
+                <div class="control-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                </div>
+                <div class="control-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="user-button">♩</div>
-    <div class="user-button">◖</div>
-    <div class="user-button">⚙</div>
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="top-bar">
+            <div class="top-bar-title">
+                <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                Friends
+            </div>
+            
+            <div class="top-bar-divider"></div>
+            
+            <div class="top-bar-tabs">
+                <div class="top-bar-tab active">Online</div>
+                <div class="top-bar-tab">All</div>
+                <div class="top-bar-tab">Pending</div>
+                <div class="top-bar-tab">Blocked</div>
+            </div>
+            
+            <div class="top-bar-divider" style="margin: 0 16px 0 0;"></div>
+            
+            <div class="add-friend-btn">Add Friend</div>
+        </div>
 
-  </div>
+        <div class="empty-state">
+            <div class="bg-blob"></div>
+            
+            <div class="graphic-container">
+                <!-- Abstract character representation matching the cat-like creature with laptop -->
+                <svg class="character-svg" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Clouds / Background elements -->
+                    <circle cx="40" cy="90" r="30" fill="#404249" />
+                    <circle cx="160" cy="100" r="25" fill="#404249" />
+                    <circle cx="100" cy="80" r="45" fill="#404249" />
+                    
+                    <!-- Stars -->
+                    <path d="M 50 40 L 53 47 L 60 50 L 53 53 L 50 60 L 47 53 L 40 50 L 47 47 Z" fill="#b5bac1" />
+                    <path d="M 150 70 L 152 74 L 156 76 L 152 78 L 150 82 L 148 78 L 144 76 L 148 74 Z" fill="#b5bac1" />
 
-</aside>
+                    <!-- Character Body -->
+                    <path d="M 75 130 C 70 80, 130 80, 125 130 Z" fill="#6366f1" />
+                    
+                    <!-- Ears -->
+                    <path d="M 75 90 L 85 60 L 95 80 Z" fill="#6366f1" />
+                    <path d="M 125 90 L 115 60 L 105 80 Z" fill="#6366f1" />
 
-<!-- FRIENDS PAGE -->
+                    <!-- Face mask (white) -->
+                    <ellipse cx="100" cy="95" rx="18" ry="14" fill="#ffffff" />
+                    <!-- Eyes -->
+                    <circle cx="92" cy="95" r="3" fill="#1e1f22" />
+                    <circle cx="108" cy="95" r="3" fill="#1e1f22" />
 
-<main class="main">
+                    <!-- Hoodie / Arms -->
+                    <path d="M 60 130 C 60 110, 80 100, 95 115 Z" fill="#1e1f22" />
+                    <path d="M 140 130 C 140 110, 120 100, 105 115 Z" fill="#1e1f22" />
 
-  <header class="topbar">
+                    <!-- Laptop -->
+                    <rect x="70" y="115" width="50" height="30" rx="3" fill="#313338" />
+                    <!-- Laptop Screen Glow/Logo -->
+                    <path d="M 88 125 C 85 122, 90 118, 95 120 C 100 122, 102 128, 95 130 C 90 132, 85 130, 88 125 Z" fill="#6366f1" />
+                    
+                    <!-- Floating message bubble -->
+                    <path d="M 140 50 C 140 30, 170 30, 170 50 C 170 65, 155 70, 145 75 C 148 70, 150 65, 140 65 Z" fill="#dbdee1" />
+                    <circle cx="150" cy="45" r="3" fill="#1e1f22" />
+                    <circle cx="160" cy="45" r="3" fill="#1e1f22" />
+                    <rect x="150" y="52" width="10" height="2" rx="1" fill="#1e1f22" />
+                </svg>
+            </div>
 
-    <div class="page-title">
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
-      </svg>
-      Friends
+            <div class="empty-text">
+                <h2>No friends online right now.</h2>
+                <p>When your friends are online, you'll see them here.</p>
+            </div>
+        </div>
     </div>
 
-    <div class="tab active">Online</div>
-    <div class="tab">All</div>
-    <div class="tab">Pending</div>
-    <div class="tab">Blocked</div>
-    <div class="tab add-friend">Add Friend</div>
-
-  </header>
-
-  <section class="content">
-
-    <div class="empty-state">
-
-      <!-- GRAYSCALE SCENE MASCOT -->
-
-      <svg class="mascot"
-           viewBox="0 0 420 660"
-           xmlns="http://www.w3.org/2000/svg"
-           role="img"
-           aria-label="scene gray hooded cat mascot">
-
-        <!-- Ground shadow -->
-        <ellipse cx="210" cy="635" rx="145" ry="12"
-                 fill="#202225" opacity=".65"/>
-
-        <!-- Head and ears -->
-        <path
-          d="M77 181
-             C74 139 91 88 116 47
-             C122 37 134 38 143 47
-             L180 83
-             C194 62 216 50 237 50
-             C258 50 276 62 292 83
-             L329 47
-             C338 38 350 37 356 47
-             C382 88 398 139 393 181
-             C411 203 416 236 404 264
-             C395 291 373 306 344 312
-             H126
-             C97 306 75 291 66 264
-             C54 236 59 203 77 181Z"
-          fill="#8e9297"
-          stroke="#17181c"
-          stroke-width="9"
-          stroke-linejoin="round"/>
-
-        <!-- Ears inner shading -->
-        <path d="M106 95L125 55L166 103Z"
-              fill="#696d74" stroke="#17181c" stroke-width="4"/>
-        <path d="M254 103L329 55L349 95Z"
-              fill="#696d74" stroke="#17181c" stroke-width="4"/>
-
-        <!-- Face -->
-        <path
-          d="M103 173
-             C103 125 140 100 210 100
-             C280 100 317 125 317 173
-             C317 221 280 244 210 244
-             C140 244 103 221 103 173Z"
-          fill="#ededed"
-          stroke="#17181c"
-          stroke-width="4"/>
-
-        <!-- Eyes -->
-        <ellipse cx="166" cy="178" rx="12" ry="22" fill="#17181c"/>
-        <ellipse cx="254" cy="178" rx="12" ry="22" fill="#17181c"/>
-
-        <ellipse cx="169" cy="169" rx="3.5" ry="6" fill="#fff"/>
-        <ellipse cx="257" cy="169" rx="3.5" ry="6" fill="#fff"/>
-
-        <!-- Hoodie collar -->
-        <path
-          d="M92 296
-             C113 287 145 295 210 329
-             C275 295 307 287 328 296
-             L346 341
-             C316 353 278 356 210 362
-             C142 356 104 353 74 341Z"
-          fill="#27292e"
-          stroke="#17181c"
-          stroke-width="9"
-          stroke-linejoin="round"/>
-
-        <!-- Arms -->
-        <path
-          d="M102 311
-             C76 321 55 344 41 381
-             L24 428
-             C18 449 33 461 59 466
-             L111 457
-             C128 415 135 368 134 340Z"
-          fill="#555960"
-          stroke="#17181c"
-          stroke-width="9"
-          stroke-linejoin="round"/>
-
-        <path
-          d="M318 311
-             C344 321 365 344 379 381
-             L396 428
-             C402 449 387 461 361 466
-             L309 457
-             C292 415 285 368 286 340Z"
-          fill="#555960"
-          stroke="#17181c"
-          stroke-width="9"
-          stroke-linejoin="round"/>
-
-        <!-- Main hoodie -->
-        <path
-          d="M112 319
-             C143 306 163 316 210 346
-             C257 316 277 306 308 319
-             C331 348 339 404 345 448
-             C347 467 334 476 312 478
-             H108
-             C86 476 73 467 75 448
-             C81 404 89 348 112 319Z"
-          fill="#383b42"
-          stroke="#17181c"
-          stroke-width="10"
-          stroke-linejoin="round"/>
-
-        <!-- Drawstring rings -->
-        <circle cx="181" cy="349" r="10"
-                fill="#888c93" stroke="#17181c" stroke-width="5"/>
-        <circle cx="239" cy="349" r="10"
-                fill="#888c93" stroke="#17181c" stroke-width="5"/>
-
-        <!-- Hoodie strings -->
-        <path d="M181 357V407 M239 357V407"
-              stroke="#91959c"
-              stroke-width="12"
-              stroke-linecap="round"/>
-
-        <path d="M181 357V407 M239 357V407"
-              stroke="#17181c"
-              stroke-width="3"
-              stroke-linecap="round"/>
-
-        <!-- Hands -->
-        <path
-          d="M26 432
-             C20 456 36 479 65 480
-             C83 481 96 469 96 450
-             L93 428Z"
-          fill="#d1d3d6"
-          stroke="#17181c"
-          stroke-width="8"/>
-
-        <path
-          d="M394 432
-             C400 456 384 479 355 480
-             C337 481 324 469 324 450
-             L327 428Z"
-          fill="#d1d3d6"
-          stroke="#17181c"
-          stroke-width="8"/>
-
-        <!-- Legs -->
-        <path
-          d="M109 472
-             H191 L184 593
-             C182 610 170 619 151 619
-             H101
-             C90 614 87 604 90 590Z"
-          fill="#303239"
-          stroke="#17181c"
-          stroke-width="9"/>
-
-        <path
-          d="M229 472
-             H311 L330 590
-             C333 604 330 614 319 619
-             H269
-             C250 619 238 610 236 593Z"
-          fill="#303239"
-          stroke="#17181c"
-          stroke-width="9"/>
-
-        <!-- Shoes -->
-        <path
-          d="M99 585
-             C119 570 160 570 184 589
-             L196 623
-             C200 643 187 653 164 653
-             H78
-             C58 653 49 641 56 624
-             C65 604 81 592 99 585Z"
-          fill="#6e737b"
-          stroke="#17181c"
-          stroke-width="9"/>
-
-        <path
-          d="M67 632
-             C90 620 151 620 188 633
-             L192 641
-             C189 650 177 653 164 653
-             H78
-             C62 653 54 644 67 632Z"
-          fill="#dedfe2"
-          stroke="#17181c"
-          stroke-width="4"/>
-
-        <path
-          d="M321 585
-             C301 570 260 570 236 589
-             L224 623
-             C220 643 233 653 256 653
-             H342
-             C362 653 371 641 364 624
-             C355 604 339 592 321 585Z"
-          fill="#6e737b"
-          stroke="#17181c"
-          stroke-width="9"/>
-
-        <path
-          d="M353 632
-             C330 620 269 620 232 633
-             L228 641
-             C231 650 243 653 256 653
-             H342
-             C358 653 366 644 353 632Z"
-          fill="#dedfe2"
-          stroke="#17181c"
-          stroke-width="4"/>
-
-      </svg>
-
-      <div class="empty-title">
-        No friends online right now.
-      </div>
-
-      <div class="empty-description">
-        When your friends are online, you'll see them here.
-      </div>
-
+    <!-- Active Now Right Sidebar -->
+    <div class="right-sidebar">
+        <div class="right-header">Active Now</div>
+        
+        <div class="active-empty">
+            <!-- Sleepy Cat SVG -->
+            <svg class="cat-icon-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 20 60 C 20 30, 80 30, 80 60 C 80 80, 20 80, 20 60 Z" fill="#2b2d31" stroke="#1e1f22" stroke-width="2"/>
+                <path d="M 20 60 L 10 35 L 35 45 Z" fill="#2b2d31" stroke="#1e1f22" stroke-width="2" />
+                <path d="M 80 60 L 90 35 L 65 45 Z" fill="#2b2d31" stroke="#1e1f22" stroke-width="2" />
+                
+                <!-- Sleepy Eyes -->
+                <path d="M 35 55 Q 40 60 45 55" fill="none" stroke="#404249" stroke-width="3" stroke-linecap="round"/>
+                <path d="M 55 55 Q 60 60 65 55" fill="none" stroke="#404249" stroke-width="3" stroke-linecap="round"/>
+                
+                <!-- Zzz -->
+                <text x="75" y="30" fill="#404249" font-family="sans-serif" font-weight="bold" font-size="12">Z</text>
+                <text x="85" y="20" fill="#404249" font-family="sans-serif" font-weight="bold" font-size="10">z</text>
+            </svg>
+            
+            <h3>It's quiet for now...</h3>
+            <p>When a friend starts an activity—like playing a game or hanging out on voice—we'll show it here!</p>
+        </div>
     </div>
-
-  </section>
-
-</main>
-
-<!-- ACTIVE NOW -->
-
-<aside class="activity">
-
-  <h2 class="activity-title">Active Now</h2>
-
-  <div class="activity-empty">
-    <strong>It's quiet for now...</strong>
-
-    <p>
-      When a friend starts an activity —
-      like playing a game or hanging out
-      on voice — we'll show it here!
-    </p>
-  </div>
-
-</aside>
 
 </div>
+
 </body>
 </html>
