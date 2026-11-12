@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>scene — Friends</title>
+<style>
+:root {
+  --darkest:#202225; --sidebar:#2f3136; --main:#36393f; --raised:#40444b;
+  --hover:#393c43; --text:#dcddde; --white:#fff; --muted:#8e9297;
+  --line:#292b2f; --purple:#7289da; --purple-hover:#677bc4;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{overflow:hidden;background:var(--main);color:var(--text);font:14px "Whitney","Helvetica Neue",Helvetica,Arial,sans-serif}
+.app{height:100vh;display:grid;grid-template-columns:72px 240px minmax(300px,1fr) 300px}
+.rail{background:var(--darkest);display:flex;align-items:center;flex-direction:column;padding:12px 0;gap:8px}
+.rail-home{width:48px;height:48px;border-radius:16px;background:var(--purple);display:grid;place-items:center;margin-bottom:2px}
+.rail-home svg{width:29px;height:29px}
+.rail-rule{height:2px;width:32px;background:#36393f;border-radius:2px;margin:1px 0 4px}
+.rail-empty{width:48px;height:48px;border-radius:50%;background:#36393f;display:grid;place-items:center;color:#b9bbbe;font-size:23px;font-weight:300}
+.rail-empty.add{margin-top:auto;margin-bottom:6px;color:#43b581}
+.sidebar{background:var(--sidebar);display:flex;flex-direction:column;min-width:0}
+.brand{height:48px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid #292b2f;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.brand-mark{width:27px;height:27px;flex:none}
+.brand-name{font-size:18px;font-weight:800;letter-spacing:.1px;color:#fff}
+.side-nav{padding:10px 8px 5px}
+.nav-item{height:40px;border-radius:4px;padding:0 10px;display:flex;align-items:center;gap:12px;color:#b9bbbe;font-weight:500;margin-bottom:2px}
+.nav-item.active{background:#42464d;color:#fff}
+.nav-item svg{width:21px;height:21px;flex:none}
+.section-head{padding:17px 16px 7px;color:#8e9297;font-size:11px;font-weight:700;letter-spacing:.45px;display:flex;justify-content:space-between;align-items:center}
+.plus{font-size:20px;font-weight:300;color:#b9bbbe}
+.empty-dms{font-size:12px;color:#72767d;padding:8px 16px;line-height:1.45}
+.user-panel{height:52px;margin-top:auto;background:#292b2f;display:flex;align-items:center;padding:0 8px;gap:8px}
+.avatar{width:32px;height:32px;border-radius:50%;background:#5865a8;display:grid;place-items:center;color:white;font-size:14px;font-weight:700}
+.user-meta{min-width:0;flex:1;line-height:1.25}
+.user-name{font-size:13px;font-weight:600;color:#fff}
+.user-tag{font-size:11px;color:#b9bbbe}
+.user-tool{width:28px;text-align:center;color:#b9bbbe;font-size:18px}
+.main{display:flex;flex-direction:column;min-width:0;background:var(--main)}
+.topbar{height:48px;min-height:48px;border-bottom:1px solid var(--line);box-shadow:0 1px 0 rgba(0,0,0,.06);display:flex;align-items:center;padding:0 16px;gap:20px}
+.top-title{font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:9px;padding-right:3px}
+.top-title svg{width:21px;height:21px;color:#b9bbbe}
+.tab{font-size:13px;font-weight:600;color:#b9bbbe;padding:5px 8px;border-radius:3px;white-space:nowrap}
+.tab.active{background:#42464d;color:#fff}
+.tab.add{background:#43b581;color:white;padding:5px 9px}
+.content{flex:1;display:grid;place-items:center;padding:24px}
+.empty-state{width:min(100%,440px);text-align:center;transform:translateY(-4px)}
+.mascot{display:block;width:245px;height:205px;margin:0 auto 14px}
+.empty-title{font-size:16px;font-weight:700;color:#fff;margin-bottom:7px}
+.empty-copy{font-size:13px;color:#b9bbbe}
+.activity{background:var(--main);border-left:1px solid var(--line);padding:18px 16px}
+.activity h2{font-size:15px;color:#fff;margin:0 0 28px;font-weight:700}
+.activity-empty{text-align:center;padding:0 8px}
+.activity-empty strong{display:block;color:#fff;font-size:14px;margin-bottom:8px}
+.activity-empty p{color:#b9bbbe;font-size:12px;line-height:1.5;margin:0}
+@media(max-width:900px){.app{grid-template-columns:64px 220px minmax(280px,1fr)}.activity{display:none}}
+@media(max-width:620px){.app{grid-template-columns:56px minmax(0,1fr)}.sidebar{display:none}.topbar{gap:7px;padding:0 10px;overflow-x:auto}.top-title{white-space:nowrap}.content{padding:12px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" aria-label="Servers">
+    <div class="rail-home" title="Home">
+      <!-- Original scene speech-mark: two chat shapes form an S -->
+      <svg viewBox="0 0 32 32" aria-label="scene" role="img">
+        <path d="M7 5h17a4 4 0 0 1 4 4v2a4 4 0 0 1-4 4H14l-7 6V9a4 4 0 0 1 4-4Z" fill="#fff"/>
+        <path d="M25 27H8a4 4 0 0 1-4-4v-2a4 4 0 0 1 4-4h10l7-6v12a4 4 0 0 1-4 4Z" fill="#dce2ff"/>
+        <path d="M11 11h11M10 21h11" stroke="#586cae" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="rail-rule"></div>
+    <div class="rail-empty add" title="Add a server">＋</div>
+    <div class="rail-empty" title="Explore">◎</div>
+  </aside>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 40 40" role="img" aria-label="scene logo">
+        <path d="M8 7h23a4 4 0 0 1 4 4v4a4 4 0 0 1-4 4H17L8 27V11a4 4 0 0 1 4-4Z" fill="#7289da"/>
+        <path d="M32 33H9a4 4 0 0 1-4-4v-4a4 4 0 0 1 4-4h14l9-8v16a4 4 0 0 1-4 4Z" fill="#99aaf0"/>
+        <path d="M13 13h15M12 27h15" stroke="#303b65" stroke-width="2.3" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-name">scene</span>
+    </div>
+    <nav class="side-nav">
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/></svg>
+        Friends
+      </div>
+    </nav>
+    <div class="section-head"><span>DIRECT MESSAGES</span><span class="plus">＋</span></div>
+    <div class="empty-dms">Your direct messages will show up here.</div>
+    <div class="user-panel">
+      <div class="avatar">U</div>
+      <div class="user-meta"><div class="user-name">User</div><div class="user-tag">#0000</div></div>
+      <div class="user-tool" title="Mute">♩</div>
+      <div class="user-tool" title="Deafen">◖</div>
+      <div class="user-tool" title="User Settings">⚙</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="top-title">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/></svg>
+        Friends
+      </div>
+      <div class="tab active">Online</div><div class="tab">All</div><div class="tab">Pending</div><div class="tab">Blocked</div><div class="tab add">Add Friend</div>
+    </header>
+    <section class="content">
+      <div class="empty-state">
+        <!-- Original mascot: a friendly little stage-spirit, drawn in a classic flat game-client illustration style -->
+        <svg class="mascot" viewBox="0 0 260 215" role="img" aria-label="scene mascot, a friendly little stage spirit">
+          <ellipse cx="130" cy="194" rx="91" ry="10" fill="#292b30" opacity=".65"/>
+          <!-- floating sparkles -->
+          <path d="M42 67v13M35.5 73.5h13M213 46v12M207 52h12" stroke="#7289da" stroke-width="3" stroke-linecap="round"/>
+          <path d="M66 118c-10-14-5-34 10-42 3-23 23-37 45-31 14-17 43-17 57 0 21-5 42 10 42 31 15 9 17 30 4 43-5 20-24 31-44 27-15 15-42 14-55 0-23 8-48-5-49-28Z" fill="#7289da"/>
+          <!-- side tufts -->
+          <path d="M73 96 56 87l5 23M188 87l16-11-2 24" fill="#7289da"/>
+          <!-- face patch -->
+          <path d="M83 99c0-21 17-38 38-38h23c21 0 38 17 38 38v28c0 19-15 34-34 34h-31c-19 0-34-15-34-34V99Z" fill="#aab8ed"/>
+          <ellipse cx="108" cy="112" rx="5" ry="7" fill="#30384f"/><ellipse cx="157" cy="112" rx="5" ry="7" fill="#30384f"/>
+          <path d="M119 128c6 7 15 7 21 0" fill="none" stroke="#46547e" stroke-width="3" stroke-linecap="round"/>
+          <ellipse cx="96" cy="123" rx="8" ry="4" fill="#e3a9bd" opacity=".75"/><ellipse cx="170" cy="123" rx="8" ry="4" fill="#e3a9bd" opacity=".75"/>
+          <!-- little scarf / collar -->
+          <path d="M91 157c13 10 61 10 76 0l-5 18c-17 10-50 10-67 0l-4-18Z" fill="#586cae"/>
+          <path d="M132 164 145 177l-13 5-9-9Z" fill="#dce2ff"/>
+          <!-- tiny arms -->
+          <path d="M74 145c-14 0-21 11-17 21 4 9 16 10 24 3M188 145c14 0 21 11 17 21-4 9-16 10-24 3" fill="none" stroke="#7289da" stroke-width="11" stroke-linecap="round"/>
+          <!-- feet -->
+          <ellipse cx="108" cy="185" rx="15" ry="7" fill="#586cae"/><ellipse cx="153" cy="185" rx="15" ry="7" fill="#586cae"/>
+          <!-- little star badge -->
+          <path d="m130 23 4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1 4-8Z" fill="#f0c674"/>
+        </svg>
+        <div class="empty-title">No friends online right now.</div>
+        <div class="empty-copy">When your friends are online, you'll see them here.</div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="activity">
+    <h2>Active Now</h2>
+    <div class="activity-empty">
+      <strong>It's quiet for now...</strong>
+      <p>When a friend starts an activity—like playing a game or hanging out on voice—we'll show it here!</p>
+    </div>
+  </aside>
+</div>
+</body>
+</html>
