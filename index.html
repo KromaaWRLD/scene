@@ -46,13 +46,12 @@ body {
   height: 100vh;
 }
 
-/* OFFICIAL SCENE S LOGO */
+/* SCENE LOGO */
 
 .scene-logo {
   width: 40px;
   height: 40px;
   display: block;
-  flex-shrink: 0;
 }
 
 .logo-path {
@@ -73,7 +72,7 @@ body {
 .home-icon {
   width: 48px;
   height: 48px;
-  border-radius: 16px;
+  border-radius: 9px;
   background: var(--blurple);
   display: grid;
   place-items: center;
@@ -94,7 +93,7 @@ body {
 .add-server {
   width: 48px;
   height: 48px;
-  border-radius: 50%;
+  border-radius: 8px;
   background: #36393f;
   color: #43b581;
   display: grid;
@@ -142,7 +141,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-radius: 4px;
+  border-radius: 5px;
   color: #b9bbbe;
   font-size: 14px;
   font-weight: 600;
@@ -266,8 +265,8 @@ body {
 }
 
 .tab {
-  padding: 5px 8px;
-  border-radius: 3px;
+  padding: 6px 9px;
+  border-radius: 5px;
   color: #b9bbbe;
   font-size: 13px;
   font-weight: 600;
@@ -283,6 +282,7 @@ body {
   background: var(--green);
   color: white;
   padding: 6px 10px;
+  border-radius: 5px;
 }
 
 /* EMPTY FRIENDS PAGE */
@@ -302,9 +302,9 @@ body {
 
 .mascot {
   width: 225px;
-  height: 280px;
+  height: auto;
   display: block;
-  margin: 0 auto 8px;
+  margin: 0 auto 15px;
 }
 
 .empty-title {
@@ -353,7 +353,7 @@ body {
   margin: 0;
 }
 
-/* SMALL SCREEN SUPPORT */
+/* RESPONSIVE */
 
 @media(max-width: 950px) {
   .app {
@@ -404,7 +404,7 @@ body {
 
   <div class="rail-divider"></div>
 
-  <div class="add-server" title="Add a server">+</div>
+  <div class="add-server">+</div>
 
 </aside>
 
@@ -436,8 +436,6 @@ body {
   <div class="dm-empty">
     No direct messages at this time.
   </div>
-
-  <!-- USER ACCOUNT -->
 
   <div class="user-panel">
 
@@ -481,17 +479,19 @@ body {
 
     <div class="empty-state">
 
-      <!-- SCENE GRAY CAT MASCOT -->
+      <!-- GRAYSCALE SCENE MASCOT -->
 
-      <svg class="mascot" viewBox="0 0 420 520"
+      <svg class="mascot"
+           viewBox="0 0 420 660"
            xmlns="http://www.w3.org/2000/svg"
-           role="img" aria-label="scene gray cat mascot">
+           role="img"
+           aria-label="scene gray hooded cat mascot">
 
-        <!-- Shadow -->
-        <ellipse cx="210" cy="495" rx="145" ry="12"
+        <!-- Ground shadow -->
+        <ellipse cx="210" cy="635" rx="145" ry="12"
                  fill="#202225" opacity=".65"/>
 
-        <!-- Cat ears and head -->
+        <!-- Head and ears -->
         <path
           d="M77 181
              C74 139 91 88 116 47
@@ -508,9 +508,15 @@ body {
              C97 306 75 291 66 264
              C54 236 59 203 77 181Z"
           fill="#8e9297"
-          stroke="#202225"
-          stroke-width="7"
+          stroke="#17181c"
+          stroke-width="9"
           stroke-linejoin="round"/>
+
+        <!-- Ears inner shading -->
+        <path d="M106 95L125 55L166 103Z"
+              fill="#696d74" stroke="#17181c" stroke-width="4"/>
+        <path d="M254 103L329 55L349 95Z"
+              fill="#696d74" stroke="#17181c" stroke-width="4"/>
 
         <!-- Face -->
         <path
@@ -519,13 +525,14 @@ body {
              C280 100 317 125 317 173
              C317 221 280 244 210 244
              C140 244 103 221 103 173Z"
-          fill="#f2f3f5"/>
+          fill="#ededed"
+          stroke="#17181c"
+          stroke-width="4"/>
 
         <!-- Eyes -->
-        <ellipse cx="166" cy="178" rx="12" ry="22" fill="#202225"/>
-        <ellipse cx="254" cy="178" rx="12" ry="22" fill="#202225"/>
+        <ellipse cx="166" cy="178" rx="12" ry="22" fill="#17181c"/>
+        <ellipse cx="254" cy="178" rx="12" ry="22" fill="#17181c"/>
 
-        <!-- Eye reflections -->
         <ellipse cx="169" cy="169" rx="3.5" ry="6" fill="#fff"/>
         <ellipse cx="257" cy="169" rx="3.5" ry="6" fill="#fff"/>
 
@@ -537,12 +544,12 @@ body {
              L346 341
              C316 353 278 356 210 362
              C142 356 104 353 74 341Z"
-          fill="#25262d"
+          fill="#27292e"
           stroke="#17181c"
-          stroke-width="7"
+          stroke-width="9"
           stroke-linejoin="round"/>
 
-        <!-- Left sleeve -->
+        <!-- Arms -->
         <path
           d="M102 311
              C76 321 55 344 41 381
@@ -550,12 +557,11 @@ body {
              C18 449 33 461 59 466
              L111 457
              C128 415 135 368 134 340Z"
-          fill="#34363e"
-          stroke="#202225"
-          stroke-width="7"
+          fill="#555960"
+          stroke="#17181c"
+          stroke-width="9"
           stroke-linejoin="round"/>
 
-        <!-- Right sleeve -->
         <path
           d="M318 311
              C344 321 365 344 379 381
@@ -563,12 +569,12 @@ body {
              C402 449 387 461 361 466
              L309 457
              C292 415 285 368 286 340Z"
-          fill="#34363e"
-          stroke="#202225"
-          stroke-width="7"
+          fill="#555960"
+          stroke="#17181c"
+          stroke-width="9"
           stroke-linejoin="round"/>
 
-        <!-- Hoodie body -->
+        <!-- Main hoodie -->
         <path
           d="M112 319
              C143 306 163 316 210 346
@@ -578,65 +584,69 @@ body {
              H108
              C86 476 73 467 75 448
              C81 404 89 348 112 319Z"
-          fill="#30323a"
-          stroke="#202225"
-          stroke-width="8"
+          fill="#383b42"
+          stroke="#17181c"
+          stroke-width="10"
           stroke-linejoin="round"/>
 
-        <!-- Drawstring circles -->
-        <circle cx="181" cy="349" r="10" fill="#8e9297" stroke="#202225" stroke-width="4"/>
-        <circle cx="239" cy="349" r="10" fill="#8e9297" stroke="#202225" stroke-width="4"/>
+        <!-- Drawstring rings -->
+        <circle cx="181" cy="349" r="10"
+                fill="#888c93" stroke="#17181c" stroke-width="5"/>
+        <circle cx="239" cy="349" r="10"
+                fill="#888c93" stroke="#17181c" stroke-width="5"/>
 
-        <!-- Drawstrings -->
+        <!-- Hoodie strings -->
         <path d="M181 357V407 M239 357V407"
-              stroke="#8e9297" stroke-width="12" stroke-linecap="round"/>
-        <path d="M181 357V407 M239 357V407"
-              stroke="#b9bbbe" stroke-width="3" stroke-linecap="round"/>
+              stroke="#91959c"
+              stroke-width="12"
+              stroke-linecap="round"/>
 
-        <!-- Left hand -->
+        <path d="M181 357V407 M239 357V407"
+              stroke="#17181c"
+              stroke-width="3"
+              stroke-linecap="round"/>
+
+        <!-- Hands -->
         <path
           d="M26 432
              C20 456 36 479 65 480
              C83 481 96 469 96 450
              L93 428Z"
-          fill="#e3e4e8"
-          stroke="#202225"
-          stroke-width="6"/>
+          fill="#d1d3d6"
+          stroke="#17181c"
+          stroke-width="8"/>
 
-        <!-- Right hand -->
         <path
           d="M394 432
              C400 456 384 479 355 480
              C337 481 324 469 324 450
              L327 428Z"
-          fill="#e3e4e8"
-          stroke="#202225"
-          stroke-width="6"/>
+          fill="#d1d3d6"
+          stroke="#17181c"
+          stroke-width="8"/>
 
-        <!-- Left leg -->
+        <!-- Legs -->
         <path
           d="M109 472
              H191 L184 593
              C182 610 170 619 151 619
              H101
              C90 614 87 604 90 590Z"
-          fill="#282a31"
-          stroke="#202225"
-          stroke-width="7"/>
+          fill="#303239"
+          stroke="#17181c"
+          stroke-width="9"/>
 
-        <!-- Right leg -->
         <path
           d="M229 472
              H311 L330 590
              C333 604 330 614 319 619
              H269
              C250 619 238 610 236 593Z"
-          fill="#282a31"
-          stroke="#202225"
-          stroke-width="7"
-          transform="translate(0 -27)"/>
+          fill="#303239"
+          stroke="#17181c"
+          stroke-width="9"/>
 
-        <!-- Left shoe -->
+        <!-- Shoes -->
         <path
           d="M99 585
              C119 570 160 570 184 589
@@ -645,19 +655,21 @@ body {
              H78
              C58 653 49 641 56 624
              C65 604 81 592 99 585Z"
-          fill="#777d86"
-          stroke="#202225"
-          stroke-width="7"/>
+          fill="#6e737b"
+          stroke="#17181c"
+          stroke-width="9"/>
 
         <path
           d="M67 632
              C90 620 151 620 188 633
              L192 641
-             C189 650 177 653 164 653H78
+             C189 650 177 653 164 653
+             H78
              C62 653 54 644 67 632Z"
-          fill="#e3e4e8"/>
+          fill="#dedfe2"
+          stroke="#17181c"
+          stroke-width="4"/>
 
-        <!-- Right shoe -->
         <path
           d="M321 585
              C301 570 260 570 236 589
@@ -666,34 +678,20 @@ body {
              H342
              C362 653 371 641 364 624
              C355 604 339 592 321 585Z"
-          fill="#777d86"
-          stroke="#202225"
-          stroke-width="7"
-          transform="translate(0 -25)"/>
+          fill="#6e737b"
+          stroke="#17181c"
+          stroke-width="9"/>
 
         <path
-          d="M353 607
-             C330 595 269 595 232 608
-             L228 616
-             C231 625 243 628 256 628H342
-             C358 628 366 619 353 607Z"
-          fill="#e3e4e8"/>
-
-        <!-- S badge on hoodie -->
-        <path
-          d="M216 425
-             H203
-             C199 425 197 428 197 432
-             V436
-             H212
-             C215 436 216 439 213 441
-             L197 453
-             H210
-             C214 453 217 450 217 446
-             V441
-             H202
-             C199 441 198 438 201 436Z"
-          fill="#7289da"/>
+          d="M353 632
+             C330 620 269 620 232 633
+             L228 641
+             C231 650 243 653 256 653
+             H342
+             C358 653 366 644 353 632Z"
+          fill="#dedfe2"
+          stroke="#17181c"
+          stroke-width="4"/>
 
       </svg>
 
@@ -718,7 +716,6 @@ body {
   <h2 class="activity-title">Active Now</h2>
 
   <div class="activity-empty">
-
     <strong>It's quiet for now...</strong>
 
     <p>
@@ -726,7 +723,6 @@ body {
       like playing a game or hanging out
       on voice — we'll show it here!
     </p>
-
   </div>
 
 </aside>
