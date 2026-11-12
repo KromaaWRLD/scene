@@ -4,528 +4,732 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>scene — Friends</title>
+<title>scene</title>
+
 <style>
 :root {
-  --darkest:#202225;
-  --sidebar:#2f3136;
-  --main:#36393f;
-  --raised:#40444b;
-  --hover:#393c43;
-  --text:#dcddde;
-  --white:#fff;
-  --muted:#8e9297;
-  --line:#292b2f;
-  --purple:#7289da;
-  --purple-hover:#677bc4;
+  --darkest: #202225;
+  --sidebar: #2f3136;
+  --main: #36393f;
+  --hover: #393c43;
+  --selected: #42464d;
+  --text: #dcddde;
+  --white: #ffffff;
+  --muted: #8e9297;
+  --line: #292b2f;
+  --blurple: #7289da;
+  --green: #3ba55c;
 }
 
 * {
-  box-sizing:border-box;
-  -webkit-user-select:none;
-  user-select:none;
-  -webkit-tap-highlight-color:transparent;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-html,body {
-  height:100%;
-  margin:0;
+html, body {
+  height: 100%;
+  margin: 0;
 }
 
 body {
-  overflow:hidden;
-  background:var(--main);
-  color:var(--text);
-  font:14px "Whitney","Helvetica Neue",Helvetica,Arial,sans-serif;
+  overflow: hidden;
+  background: var(--main);
+  color: var(--text);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
 }
 
 .app {
-  height:100vh;
-  display:grid;
-  grid-template-columns:72px 240px minmax(300px,1fr) 300px;
+  display: grid;
+  grid-template-columns: 72px 240px minmax(300px, 1fr) 240px;
+  height: 100vh;
 }
+
+/* OFFICIAL SCENE S LOGO */
+
+.scene-logo {
+  width: 40px;
+  height: 40px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.logo-path {
+  fill: var(--blurple);
+}
+
+/* SERVER RAIL */
 
 .rail {
-  background:var(--darkest);
-  display:flex;
-  align-items:center;
-  flex-direction:column;
-  padding:12px 0;
-  gap:8px;
+  background: var(--darkest);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 8px;
 }
 
-.rail-home {
-  width:48px;
-  height:48px;
-  border-radius:16px;
-  background:var(--purple);
-  display:grid;
-  place-items:center;
-  margin-bottom:2px;
+.home-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: var(--blurple);
+  display: grid;
+  place-items: center;
 }
 
-.rail-home svg {
-  width:29px;
-  height:29px;
+.home-icon .scene-logo {
+  width: 34px;
+  height: 34px;
 }
 
-.rail-rule {
-  height:2px;
-  width:32px;
-  background:#36393f;
-  border-radius:2px;
-  margin:1px 0 4px;
+.rail-divider {
+  width: 32px;
+  height: 2px;
+  background: #36393f;
+  margin: 3px 0;
 }
 
-.rail-empty {
-  width:48px;
-  height:48px;
-  border-radius:50%;
-  background:#36393f;
-  display:grid;
-  place-items:center;
-  color:#b9bbbe;
-  font-size:23px;
-  font-weight:300;
+.add-server {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #36393f;
+  color: #43b581;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 300;
+  margin-top: auto;
+  margin-bottom: 5px;
 }
 
-.rail-empty.add {
-  margin-top:auto;
-  margin-bottom:6px;
-  color:#43b581;
-  border-radius:50%;
-}
+/* LEFT SIDEBAR */
 
 .sidebar {
-  background:var(--sidebar);
-  display:flex;
-  flex-direction:column;
-  min-width:0;
+  background: var(--sidebar);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.brand {
-  height:48px;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:0 16px;
-  border-bottom:1px solid #292b2f;
-  box-shadow:0 1px 0 rgba(0,0,0,.08);
+.sidebar-header {
+  height: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
 }
 
-.brand-mark {
-  width:27px;
-  height:27px;
-  flex:none;
+.chevron {
+  color: var(--muted);
+  font-size: 16px;
 }
 
-.brand-name {
-  font-size:18px;
-  font-weight:800;
-  letter-spacing:.1px;
-  color:#fff;
-}
-
-.side-nav {
-  padding:10px 8px 5px;
+.navigation {
+  padding: 10px 8px;
 }
 
 .nav-item {
-  height:40px;
-  border-radius:4px;
-  padding:0 10px;
-  display:flex;
-  align-items:center;
-  gap:12px;
-  color:#b9bbbe;
-  font-weight:500;
-  margin-bottom:2px;
+  height: 40px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 4px;
+  color: #b9bbbe;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 3px;
 }
 
 .nav-item.active {
-  background:#42464d;
-  color:#fff;
+  background: var(--selected);
+  color: white;
 }
 
 .nav-item svg {
-  width:21px;
-  height:21px;
-  flex:none;
+  width: 21px;
+  height: 21px;
 }
 
-.section-head {
-  padding:17px 16px 7px;
-  color:#8e9297;
-  font-size:11px;
-  font-weight:700;
-  letter-spacing:.45px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
+.dm-heading {
+  padding: 14px 16px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #8e9297;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .plus {
-  font-size:20px;
-  font-weight:300;
-  color:#b9bbbe;
+  font-size: 21px;
+  font-weight: 300;
+  color: #b9bbbe;
 }
 
-.empty-dms {
-  font-size:12px;
-  color:#72767d;
-  padding:8px 16px;
-  line-height:1.45;
+.dm-empty {
+  padding: 10px 18px;
+  color: #72767d;
+  font-size: 12px;
+  line-height: 1.6;
 }
+
+/* USER PANEL */
 
 .user-panel {
-  height:52px;
-  margin-top:auto;
-  background:#292b2f;
-  display:flex;
-  align-items:center;
-  padding:0 8px;
-  gap:8px;
+  height: 52px;
+  min-height: 52px;
+  margin-top: auto;
+  background: #292b2f;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 8px;
 }
 
-.avatar {
-  width:32px;
-  height:32px;
-  border-radius:50%;
-  background:#5865a8;
-  display:grid;
-  place-items:center;
-  color:white;
-  font-size:14px;
-  font-weight:700;
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #5865a8;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 700;
 }
 
-.user-meta {
-  min-width:0;
-  flex:1;
-  line-height:1.25;
+.user-info {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
 }
 
 .user-name {
-  font-size:13px;
-  font-weight:600;
-  color:#fff;
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
 }
 
 .user-tag {
-  font-size:11px;
-  color:#b9bbbe;
+  color: #b9bbbe;
+  font-size: 11px;
 }
 
-.user-tool {
-  width:28px;
-  text-align:center;
-  color:#b9bbbe;
-  font-size:18px;
+.user-button {
+  color: #b9bbbe;
+  width: 28px;
+  text-align: center;
+  font-size: 18px;
 }
+
+/* MAIN CONTENT */
 
 .main {
-  display:flex;
-  flex-direction:column;
-  min-width:0;
-  background:var(--main);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--main);
 }
 
 .topbar {
-  height:48px;
-  min-height:48px;
-  border-bottom:1px solid var(--line);
-  box-shadow:0 1px 0 rgba(0,0,0,.06);
-  display:flex;
-  align-items:center;
-  padding:0 16px;
-  gap:20px;
+  height: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 19px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
 }
 
-.top-title {
-  font-size:15px;
-  font-weight:700;
-  color:#fff;
-  display:flex;
-  align-items:center;
-  gap:9px;
-  padding-right:3px;
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+  margin-right: 4px;
 }
 
-.top-title svg {
-  width:21px;
-  height:21px;
-  color:#b9bbbe;
+.page-title svg {
+  width: 21px;
+  height: 21px;
+  color: #b9bbbe;
 }
 
 .tab {
-  font-size:13px;
-  font-weight:600;
-  color:#b9bbbe;
-  padding:5px 8px;
-  border-radius:3px;
-  white-space:nowrap;
+  padding: 5px 8px;
+  border-radius: 3px;
+  color: #b9bbbe;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .tab.active {
-  background:#42464d;
-  color:#fff;
+  background: var(--selected);
+  color: white;
 }
 
-.tab.add {
-  background:#43b581;
-  color:white;
-  padding:5px 9px;
+.tab.add-friend {
+  background: var(--green);
+  color: white;
+  padding: 6px 10px;
 }
+
+/* EMPTY FRIENDS PAGE */
 
 .content {
-  flex:1;
-  display:grid;
-  place-items:center;
-  padding:24px;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 20px;
 }
 
 .empty-state {
-  width:min(100%,440px);
-  text-align:center;
-  transform:translateY(-4px);
+  width: 100%;
+  text-align: center;
+  transform: translateY(-8px);
 }
 
 .mascot {
-  display:block;
-  width:245px;
-  height:205px;
-  margin:0 auto 14px;
+  width: 225px;
+  height: 280px;
+  display: block;
+  margin: 0 auto 8px;
 }
 
 .empty-title {
-  font-size:16px;
-  font-weight:700;
-  color:#fff;
-  margin-bottom:7px;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
 }
 
-.empty-copy {
-  font-size:13px;
-  color:#b9bbbe;
+.empty-description {
+  color: #b9bbbe;
+  font-size: 13px;
 }
+
+/* ACTIVE NOW */
 
 .activity {
-  background:var(--main);
-  border-left:1px solid var(--line);
-  padding:18px 16px;
+  border-left: 1px solid var(--line);
+  background: var(--main);
+  padding: 18px 16px;
 }
 
-.activity h2 {
-  font-size:15px;
-  color:#fff;
-  margin:0 0 28px;
-  font-weight:700;
+.activity-title {
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 35px;
 }
 
 .activity-empty {
-  text-align:center;
-  padding:0 8px;
+  text-align: center;
+  padding: 0 7px;
 }
 
 .activity-empty strong {
-  display:block;
-  color:#fff;
-  font-size:14px;
-  margin-bottom:8px;
+  color: white;
+  font-size: 14px;
+  display: block;
+  margin-bottom: 8px;
 }
 
 .activity-empty p {
-  color:#b9bbbe;
-  font-size:12px;
-  line-height:1.5;
-  margin:0;
+  color: #b9bbbe;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
 }
 
-@media(max-width:900px) {
+/* SMALL SCREEN SUPPORT */
+
+@media(max-width: 950px) {
   .app {
-    grid-template-columns:64px 220px minmax(280px,1fr);
+    grid-template-columns: 64px 220px minmax(280px, 1fr);
   }
+
   .activity {
-    display:none;
+    display: none;
   }
 }
 
-@media(max-width:620px) {
+@media(max-width: 620px) {
   .app {
-    grid-template-columns:56px minmax(0,1fr);
+    grid-template-columns: 56px minmax(0, 1fr);
   }
+
   .sidebar {
-    display:none;
+    display: none;
   }
+
   .topbar {
-    gap:7px;
-    padding:0 10px;
-    overflow-x:auto;
+    gap: 7px;
+    padding: 0 10px;
+    overflow-x: auto;
   }
-  .top-title {
-    white-space:nowrap;
-  }
+
   .content {
-    padding:12px;
+    padding: 10px;
   }
 }
 </style>
 </head>
 
 <body>
+
 <div class="app">
 
-  <!-- SERVER SIDEBAR -->
-  <aside class="rail" aria-label="Servers">
+<!-- SERVER RAIL -->
 
-    <div class="rail-home" title="Home">
-      <svg viewBox="0 0 32 32" aria-label="scene" role="img">
-        <path d="M7 5h17a4 4 0 0 1 4 4v2a4 4 0 0 1-4 4H14l-7 6V9a4 4 0 0 1 4-4Z" fill="#fff"/>
-        <path d="M25 27H8a4 4 0 0 1-4-4v-2a4 4 0 0 1 4-4h10l7-6v12a4 4 0 0 1-4 4Z" fill="#dce2ff"/>
-        <path d="M11 11h11M10 21h11" stroke="#586cae" stroke-width="2" stroke-linecap="round"/>
+<aside class="rail">
+
+  <div class="home-icon">
+    <svg class="scene-logo" viewBox="0 0 40 48">
+      <path class="logo-path"
+        d="M34 4H19C11 4 6 10 6 18V24H25C28 24 29 27 26 29L6 44H21C29 44 34 38 34 30V24H15C12 24 11 21 14 19L34 4Z"/>
+    </svg>
+  </div>
+
+  <div class="rail-divider"></div>
+
+  <div class="add-server" title="Add a server">+</div>
+
+</aside>
+
+<!-- DIRECT MESSAGES -->
+
+<aside class="sidebar">
+
+  <div class="sidebar-header">
+    <span>scene</span>
+    <span class="chevron">⌄</span>
+  </div>
+
+  <nav class="navigation">
+
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
       </svg>
+      Friends
     </div>
 
-    <div class="rail-rule"></div>
+  </nav>
 
-    <div class="rail-empty add" title="Add a server">＋</div>
+  <div class="dm-heading">
+    <span>DIRECT MESSAGES</span>
+    <span class="plus">+</span>
+  </div>
 
-  </aside>
+  <div class="dm-empty">
+    No direct messages at this time.
+  </div>
 
-  <!-- DIRECT MESSAGE SIDEBAR -->
-  <aside class="sidebar">
+  <!-- USER ACCOUNT -->
 
-    <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 40 40" role="img" aria-label="scene logo">
-        <path d="M8 7h23a4 4 0 0 1 4 4v4a4 4 0 0 1-4 4H17L8 27V11a4 4 0 0 1 4-4Z" fill="#7289da"/>
-        <path d="M32 33H9a4 4 0 0 1-4-4v-4a4 4 0 0 1 4-4h14l9-8v16a4 4 0 0 1-4 4Z" fill="#99aaf0"/>
-        <path d="M13 13h15M12 27h15" stroke="#303b65" stroke-width="2.3" stroke-linecap="round"/>
+  <div class="user-panel">
+
+    <div class="user-avatar">U</div>
+
+    <div class="user-info">
+      <div class="user-name">User</div>
+      <div class="user-tag">#0000</div>
+    </div>
+
+    <div class="user-button">♩</div>
+    <div class="user-button">◖</div>
+    <div class="user-button">⚙</div>
+
+  </div>
+
+</aside>
+
+<!-- FRIENDS PAGE -->
+
+<main class="main">
+
+  <header class="topbar">
+
+    <div class="page-title">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
       </svg>
-      <span class="brand-name">scene</span>
+      Friends
     </div>
 
-    <nav class="side-nav">
-      <div class="nav-item active">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
-        </svg>
-        Friends
+    <div class="tab active">Online</div>
+    <div class="tab">All</div>
+    <div class="tab">Pending</div>
+    <div class="tab">Blocked</div>
+    <div class="tab add-friend">Add Friend</div>
+
+  </header>
+
+  <section class="content">
+
+    <div class="empty-state">
+
+      <!-- SCENE GRAY CAT MASCOT -->
+
+      <svg class="mascot" viewBox="0 0 420 520"
+           xmlns="http://www.w3.org/2000/svg"
+           role="img" aria-label="scene gray cat mascot">
+
+        <!-- Shadow -->
+        <ellipse cx="210" cy="495" rx="145" ry="12"
+                 fill="#202225" opacity=".65"/>
+
+        <!-- Cat ears and head -->
+        <path
+          d="M77 181
+             C74 139 91 88 116 47
+             C122 37 134 38 143 47
+             L180 83
+             C194 62 216 50 237 50
+             C258 50 276 62 292 83
+             L329 47
+             C338 38 350 37 356 47
+             C382 88 398 139 393 181
+             C411 203 416 236 404 264
+             C395 291 373 306 344 312
+             H126
+             C97 306 75 291 66 264
+             C54 236 59 203 77 181Z"
+          fill="#8e9297"
+          stroke="#202225"
+          stroke-width="7"
+          stroke-linejoin="round"/>
+
+        <!-- Face -->
+        <path
+          d="M103 173
+             C103 125 140 100 210 100
+             C280 100 317 125 317 173
+             C317 221 280 244 210 244
+             C140 244 103 221 103 173Z"
+          fill="#f2f3f5"/>
+
+        <!-- Eyes -->
+        <ellipse cx="166" cy="178" rx="12" ry="22" fill="#202225"/>
+        <ellipse cx="254" cy="178" rx="12" ry="22" fill="#202225"/>
+
+        <!-- Eye reflections -->
+        <ellipse cx="169" cy="169" rx="3.5" ry="6" fill="#fff"/>
+        <ellipse cx="257" cy="169" rx="3.5" ry="6" fill="#fff"/>
+
+        <!-- Hoodie collar -->
+        <path
+          d="M92 296
+             C113 287 145 295 210 329
+             C275 295 307 287 328 296
+             L346 341
+             C316 353 278 356 210 362
+             C142 356 104 353 74 341Z"
+          fill="#25262d"
+          stroke="#17181c"
+          stroke-width="7"
+          stroke-linejoin="round"/>
+
+        <!-- Left sleeve -->
+        <path
+          d="M102 311
+             C76 321 55 344 41 381
+             L24 428
+             C18 449 33 461 59 466
+             L111 457
+             C128 415 135 368 134 340Z"
+          fill="#34363e"
+          stroke="#202225"
+          stroke-width="7"
+          stroke-linejoin="round"/>
+
+        <!-- Right sleeve -->
+        <path
+          d="M318 311
+             C344 321 365 344 379 381
+             L396 428
+             C402 449 387 461 361 466
+             L309 457
+             C292 415 285 368 286 340Z"
+          fill="#34363e"
+          stroke="#202225"
+          stroke-width="7"
+          stroke-linejoin="round"/>
+
+        <!-- Hoodie body -->
+        <path
+          d="M112 319
+             C143 306 163 316 210 346
+             C257 316 277 306 308 319
+             C331 348 339 404 345 448
+             C347 467 334 476 312 478
+             H108
+             C86 476 73 467 75 448
+             C81 404 89 348 112 319Z"
+          fill="#30323a"
+          stroke="#202225"
+          stroke-width="8"
+          stroke-linejoin="round"/>
+
+        <!-- Drawstring circles -->
+        <circle cx="181" cy="349" r="10" fill="#8e9297" stroke="#202225" stroke-width="4"/>
+        <circle cx="239" cy="349" r="10" fill="#8e9297" stroke="#202225" stroke-width="4"/>
+
+        <!-- Drawstrings -->
+        <path d="M181 357V407 M239 357V407"
+              stroke="#8e9297" stroke-width="12" stroke-linecap="round"/>
+        <path d="M181 357V407 M239 357V407"
+              stroke="#b9bbbe" stroke-width="3" stroke-linecap="round"/>
+
+        <!-- Left hand -->
+        <path
+          d="M26 432
+             C20 456 36 479 65 480
+             C83 481 96 469 96 450
+             L93 428Z"
+          fill="#e3e4e8"
+          stroke="#202225"
+          stroke-width="6"/>
+
+        <!-- Right hand -->
+        <path
+          d="M394 432
+             C400 456 384 479 355 480
+             C337 481 324 469 324 450
+             L327 428Z"
+          fill="#e3e4e8"
+          stroke="#202225"
+          stroke-width="6"/>
+
+        <!-- Left leg -->
+        <path
+          d="M109 472
+             H191 L184 593
+             C182 610 170 619 151 619
+             H101
+             C90 614 87 604 90 590Z"
+          fill="#282a31"
+          stroke="#202225"
+          stroke-width="7"/>
+
+        <!-- Right leg -->
+        <path
+          d="M229 472
+             H311 L330 590
+             C333 604 330 614 319 619
+             H269
+             C250 619 238 610 236 593Z"
+          fill="#282a31"
+          stroke="#202225"
+          stroke-width="7"
+          transform="translate(0 -27)"/>
+
+        <!-- Left shoe -->
+        <path
+          d="M99 585
+             C119 570 160 570 184 589
+             L196 623
+             C200 643 187 653 164 653
+             H78
+             C58 653 49 641 56 624
+             C65 604 81 592 99 585Z"
+          fill="#777d86"
+          stroke="#202225"
+          stroke-width="7"/>
+
+        <path
+          d="M67 632
+             C90 620 151 620 188 633
+             L192 641
+             C189 650 177 653 164 653H78
+             C62 653 54 644 67 632Z"
+          fill="#e3e4e8"/>
+
+        <!-- Right shoe -->
+        <path
+          d="M321 585
+             C301 570 260 570 236 589
+             L224 623
+             C220 643 233 653 256 653
+             H342
+             C362 653 371 641 364 624
+             C355 604 339 592 321 585Z"
+          fill="#777d86"
+          stroke="#202225"
+          stroke-width="7"
+          transform="translate(0 -25)"/>
+
+        <path
+          d="M353 607
+             C330 595 269 595 232 608
+             L228 616
+             C231 625 243 628 256 628H342
+             C358 628 366 619 353 607Z"
+          fill="#e3e4e8"/>
+
+        <!-- S badge on hoodie -->
+        <path
+          d="M216 425
+             H203
+             C199 425 197 428 197 432
+             V436
+             H212
+             C215 436 216 439 213 441
+             L197 453
+             H210
+             C214 453 217 450 217 446
+             V441
+             H202
+             C199 441 198 438 201 436Z"
+          fill="#7289da"/>
+
+      </svg>
+
+      <div class="empty-title">
+        No friends online right now.
       </div>
-    </nav>
 
-    <div class="section-head">
-      <span>DIRECT MESSAGES</span>
-      <span class="plus">＋</span>
-    </div>
-
-    <div class="empty-dms">
-      Your direct messages will show up here.
-    </div>
-
-    <!-- USER PANEL -->
-    <div class="user-panel">
-      <div class="avatar">U</div>
-
-      <div class="user-meta">
-        <div class="user-name">User</div>
-        <div class="user-tag">#0000</div>
+      <div class="empty-description">
+        When your friends are online, you'll see them here.
       </div>
 
-      <div class="user-tool" title="Mute">♩</div>
-      <div class="user-tool" title="Deafen">◖</div>
-      <div class="user-tool" title="User Settings">⚙</div>
     </div>
 
-  </aside>
+  </section>
 
-  <!-- MAIN FRIENDS PAGE -->
-  <main class="main">
+</main>
 
-    <header class="topbar">
-      <div class="top-title">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
-        </svg>
-        Friends
-      </div>
+<!-- ACTIVE NOW -->
 
-      <div class="tab active">Online</div>
-      <div class="tab">All</div>
-      <div class="tab">Pending</div>
-      <div class="tab">Blocked</div>
-      <div class="tab add">Add Friend</div>
-    </header>
+<aside class="activity">
 
-    <section class="content">
-      <div class="empty-state">
+  <h2 class="activity-title">Active Now</h2>
 
-        <!-- ORIGINAL SCENE MASCOT -->
-        <svg class="mascot" viewBox="0 0 260 215" role="img" aria-label="scene mascot, a friendly chat creature">
+  <div class="activity-empty">
 
-          <ellipse cx="130" cy="190" rx="78" ry="9" fill="#292b30" opacity=".65"/>
+    <strong>It's quiet for now...</strong>
 
-          <!-- Antenna -->
-          <path d="M130 35V22" stroke="#7289da" stroke-width="7" stroke-linecap="round"/>
-          <circle cx="130" cy="17" r="7" fill="#99aaf0"/>
+    <p>
+      When a friend starts an activity —
+      like playing a game or hanging out
+      on voice — we'll show it here!
+    </p>
 
-          <!-- Arms -->
-          <path d="M69 91c-16-12-29-2-29 13 0 12 8 19 21 17M191 91c16-12 29-2 29 13 0 12-8 19-21 17"
-                fill="none" stroke="#5865a8" stroke-width="12" stroke-linecap="round"/>
+  </div>
 
-          <!-- Body -->
-          <path d="M58 105c0-38 28-66 66-66h12c38 0 66 28 66 66v31c0 31-25 56-56 56h-32c-31 0-56-25-56-56v-31Z"
-                fill="#7289da"/>
-
-          <!-- Face -->
-          <path d="M78 105c0-27 20-47 47-47h10c27 0 47 20 47 47v26c0 24-19 43-43 43h-18c-24 0-43-19-43-43v-26Z"
-                fill="#d9def0"/>
-
-          <ellipse cx="108" cy="111" rx="6" ry="8" fill="#343944"/>
-          <ellipse cx="152" cy="111" rx="6" ry="8" fill="#343944"/>
-
-          <path d="M117 130c7 8 19 8 26 0"
-                fill="none" stroke="#5865a8" stroke-width="4" stroke-linecap="round"/>
-
-          <ellipse cx="94" cy="126" rx="9" ry="5" fill="#e8a9b8" opacity=".8"/>
-          <ellipse cx="166" cy="126" rx="9" ry="5" fill="#e8a9b8" opacity=".8"/>
-
-          <!-- Chat badge -->
-          <path d="M99 153h62c8 0 14 6 14 14v4c0 8-6 14-14 14h-29l-13 10v-10H99c-8 0-14-6-14-14v-4c0-8 6-14 14-14Z"
-                fill="#5865a8" stroke="#d9def0" stroke-width="3"/>
-
-          <circle cx="113" cy="169" r="3.5" fill="#fff"/>
-          <circle cx="130" cy="169" r="3.5" fill="#fff"/>
-          <circle cx="147" cy="169" r="3.5" fill="#fff"/>
-
-          <!-- Floating stars -->
-          <path d="m45 55 4 9 9 4-9 4-4 9-4-9-9-4 9-4 4-9Zm173 9 3 6 6 3-6 3-3 6-3-6-6-3 6-3 3-6Z"
-                fill="#f0c674"/>
-
-        </svg>
-
-        <div class="empty-title">No friends online right now.</div>
-        <div class="empty-copy">When your friends are online, you'll see them here.</div>
-
-      </div>
-    </section>
-
-  </main>
-
-  <!-- ACTIVE NOW PANEL -->
-  <aside class="activity">
-
-    <h2>Active Now</h2>
-
-    <div class="activity-empty">
-      <strong>It's quiet for now...</strong>
-
-      <p>
-        When a friend starts an activity—like playing a game
-        or hanging out on voice—we'll show it here!
-      </p>
-    </div>
-
-  </aside>
+</aside>
 
 </div>
 </body>
