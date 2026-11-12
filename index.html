@@ -3,461 +3,574 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>scene</title>
+
 <style>
 :root {
-  --rail:#1e1f22;
-  --sidebar:#232428;
-  --main:#2b2d31;
-  --selected:#404249;
-  --text:#f2f3f5;
-  --muted:#b5bac1;
-  --dim:#858995;
-  --line:#3f4147;
-  --purple:#7289da;
+  --rail: #202225;
+  --sidebar: #232428;
+  --main: #2b2d31;
+  --hover: #393b42;
+  --selected: #404249;
+  --text: #f2f3f5;
+  --muted: #b5bac1;
+  --dim: #858995;
+  --line: #3b3d43;
+  --purple: #7289da;
+  --green: #3ba55c;
 }
+
 * {
-  box-sizing:border-box;
-  user-select:none;
-  -webkit-user-select:none;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
 }
-html,body {
-  width:100%;height:100%;margin:0;
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
 }
+
 body {
-  overflow:hidden;
-  background:var(--main);
-  color:var(--text);
-  font:14px "Helvetica Neue",Helvetica,Arial,sans-serif;
+  overflow: hidden;
+  background: var(--main);
+  color: var(--text);
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
 }
+
+svg {
+  display: block;
+}
+
 .app {
-  height:100vh;
-  min-height:560px;
-  display:grid;
-  grid-template-columns:108px 291px minmax(420px,1fr) 328px;
+  height: 100vh;
+  min-height: 540px;
+  display: grid;
+  grid-template-columns: 108px 291px minmax(0, 1fr) 328px;
+}
+
+/* OFFICIAL SCENE LOGO */
+
+.scene-logo {
+  width: 36px;
+  height: 44px;
+  flex-shrink: 0;
 }
 
 /* SERVER RAIL */
 
 .server-rail {
-  background:var(--rail);
-  border-right:1px solid #191a1d;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-}
-.home-tile {
-  height:82px;
-  width:100%;
-  display:grid;
-  place-items:center;
-  border-bottom:1px solid #191a1d;
-}
-.scene-logo {
-  width:55px;
-  height:55px;
-}
-.server-plus {
-  margin-top:auto;
-  margin-bottom:20px;
-  width:64px;
-  height:64px;
-  border-radius:9px;
-  background:#303238;
-  display:grid;
-  place-items:center;
-  color:#c3c6ce;
-  font-size:38px;
-  font-weight:300;
+  background: var(--rail);
+  border-right: 1px solid #191a1d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-/* DM SIDEBAR */
+.home-tile {
+  height: 82px;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  border-bottom: 1px solid #191a1d;
+}
+
+.server-plus {
+  margin-top: auto;
+  margin-bottom: 19px;
+  width: 64px;
+  height: 64px;
+  background: #303238;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #b9bbbe;
+}
+
+/* DIRECT MESSAGE SIDEBAR */
 
 .dm-sidebar {
-  background:var(--sidebar);
-  border-right:1px solid #202126;
-  display:flex;
-  flex-direction:column;
-}
-.sidebar-heading {
-  height:82px;
-  min-height:82px;
-  padding:0 27px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  border-bottom:1px solid var(--line);
-  font-size:21px;
-  font-weight:750;
-  color:white;
-}
-.chevron {
-  color:#9298a8;
-  font-size:24px;
-}
-.side-nav {
-  padding:10px 14px 0;
-}
-.side-item {
-  height:64px;
-  display:flex;
-  align-items:center;
-  gap:16px;
-  padding:0 19px;
-  border-radius:8px;
-  color:#c7c9d1;
-  font-size:18px;
-  font-weight:600;
-}
-.side-item.selected {
-  background:#3b3d49;
-  color:white;
-}
-.side-item svg {
-  width:30px;
-  height:30px;
-}
-.dm-heading {
-  margin-top:41px;
-  padding:0 25px;
-  height:32px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  color:#9a9daa;
-  font-size:15px;
-  font-weight:750;
-}
-.dm-plus {
-  font-size:29px;
-  font-weight:300;
-  color:#aeb2c0;
-}
-.dm-empty {
-  padding:19px 25px;
-  text-align:center;
-  color:#858997;
-  font-size:16px;
-  line-height:1.65;
+  background: var(--sidebar);
+  border-right: 1px solid #202126;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-/* ACCOUNT BAR */
+.sidebar-heading {
+  height: 82px;
+  min-height: 82px;
+  padding: 0 27px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  font-size: 20px;
+  font-weight: 750;
+  color: white;
+}
+
+.dropdown {
+  color: #9298a8;
+}
+
+.side-nav {
+  padding: 10px 14px 0;
+}
+
+.side-item {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 19px;
+  border-radius: 8px;
+  color: #c7c9d1;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.side-item.selected {
+  background: var(--selected);
+  color: white;
+}
+
+.side-item svg {
+  width: 27px;
+  height: 27px;
+}
+
+.dm-heading {
+  margin-top: 41px;
+  padding: 0 25px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #9a9daa;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.dm-empty {
+  padding: 17px 25px;
+  text-align: center;
+  color: #858997;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+/* USER ACCOUNT */
 
 .account-bar {
-  margin-top:auto;
-  height:99px;
-  min-height:99px;
-  border-top:1px solid var(--line);
-  display:flex;
-  align-items:center;
-  gap:13px;
-  padding:0 19px;
-  background:#25262b;
-}
-.account-avatar {
-  width:52px;
-  height:52px;
-  background:#1b1c22;
-  border-radius:50%;
-  display:grid;
-  place-items:center;
-}
-.account-avatar svg {
-  width:44px;
-  height:44px;
-}
-.account-info {
-  flex:1;
-}
-.account-name {
-  font-size:16px;
-  font-weight:700;
-  color:white;
-}
-.account-tag {
-  color:#a6a9b4;
-  font-size:14px;
-}
-.account-tools {
-  display:flex;
-  align-items:center;
-  gap:12px;
-  color:#aeb2bd;
-  font-size:23px;
+  margin-top: auto;
+  height: 99px;
+  min-height: 99px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 0 19px;
+  background: #25262b;
 }
 
-/* MAIN FRIENDS VIEW */
+.account-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #41434b;
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.account-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+}
+
+.account-tag {
+  color: #a6a9b4;
+  font-size: 13px;
+}
+
+.account-tools {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #aeb2bd;
+}
+
+.account-tools svg {
+  width: 23px;
+  height: 23px;
+}
+
+/* TOP HEADER */
 
 .main-panel {
-  display:flex;
-  flex-direction:column;
-  min-width:0;
-  background:var(--main);
-}
-.topbar {
-  height:82px;
-  min-height:82px;
-  display:flex;
-  align-items:center;
-  gap:27px;
-  padding:0 26px;
-  border-bottom:1px solid var(--line);
-  white-space:nowrap;
-  overflow-x:auto;
-}
-.page-title {
-  display:flex;
-  align-items:center;
-  gap:15px;
-  color:white;
-  font-size:22px;
-  font-weight:750;
-  margin-right:13px;
-}
-.page-title svg {
-  width:31px;
-  height:31px;
-  color:#b8bbc6;
-}
-.tab {
-  color:#b7bbc7;
-  font-size:18px;
-  font-weight:600;
-  padding:11px 17px;
-  border-radius:7px;
-}
-.tab.current {
-  color:white;
-  background:#41434c;
-}
-.tab.add-friend {
-  color:#8c78f4;
-  margin-left:2px;
-}
-.tab-separator {
-  height:35px;
-  width:1px;
-  background:#4a4c55;
-  margin:0 -7px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--main);
 }
 
-/* CENTER MASCOT */
+.topbar {
+  height: 82px;
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding: 0 25px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  color: white;
+  font-size: 20px;
+  font-weight: 750;
+  margin-right: 8px;
+}
+
+.page-title svg {
+  width: 27px;
+  height: 27px;
+  color: #b8bbc6;
+}
+
+.tab {
+  color: #b7bbc7;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 9px 13px;
+  border-radius: 6px;
+}
+
+.tab.current {
+  color: white;
+  background: #41434c;
+}
+
+.tab.add-friend {
+  color: #8875f1;
+  margin-left: 2px;
+}
+
+.tab-separator {
+  height: 34px;
+  width: 1px;
+  background: #4a4c55;
+}
+
+/* FRIENDS EMPTY STATE */
 
 .friends-content {
-  flex:1;
-  display:grid;
-  place-items:center;
-  min-height:0;
-  overflow:hidden;
-  padding:24px;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  overflow: hidden;
+  padding: 25px;
 }
+
 .empty-state {
-  width:min(100%,740px);
-  text-align:center;
-  transform:translateY(-7px);
+  width: 100%;
+  max-width: 690px;
+  text-align: center;
+  transform: translateY(-5px);
 }
+
 .illustration {
-  position:relative;
-  width:min(100%,690px);
-  margin:0 auto 12px;
+  position: relative;
+  width: 100%;
+  max-width: 580px;
+  margin: 0 auto 15px;
 }
+
 .cloud-art {
-  position:absolute;
-  left:3%;
-  bottom:5%;
-  width:94%;
-  height:auto;
-  z-index:0;
+  position: absolute;
+  left: 2%;
+  bottom: 4%;
+  width: 96%;
+  z-index: 0;
 }
+
 .mascot-art {
-  position:relative;
-  z-index:1;
-  width:100%;
-  height:auto;
-  display:block;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: auto;
+  display: block;
 }
+
 .empty-title {
-  color:#f2f3f5;
-  font-size:25px;
-  font-weight:750;
-  margin:8px 0;
+  color: white;
+  font-size: 20px;
+  font-weight: 750;
+  margin: 8px 0;
 }
+
 .empty-description {
-  color:#aeb2bf;
-  font-size:19px;
+  color: #aeb2bf;
+  font-size: 15px;
 }
 
 /* ACTIVE NOW */
 
 .activity-panel {
-  background:var(--main);
-  border-left:1px solid var(--line);
-  padding:24px 23px;
+  background: var(--main);
+  border-left: 1px solid var(--line);
+  padding: 24px 23px;
 }
+
 .activity-title {
-  margin:0;
-  color:#f2f3f5;
-  font-size:24px;
-  font-weight:750;
+  margin: 0;
+  color: #f2f3f5;
+  font-size: 21px;
+  font-weight: 750;
 }
+
 .activity-empty {
-  text-align:center;
-  margin-top:73px;
+  text-align: center;
+  margin-top: 70px;
+  padding: 0 8px;
 }
-.sleepy-mascot {
-  width:190px;
-  height:125px;
-  margin:0 auto 20px;
-  display:block;
-}
+
 .activity-caption {
-  color:white;
-  font-size:18px;
-  font-weight:700;
-  margin-bottom:9px;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 9px;
 }
+
 .activity-copy {
-  color:#aeb2bf;
-  font-size:16px;
-  line-height:1.55;
+  color: #aeb2bf;
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 /* RESPONSIVE */
 
-@media(max-width:1250px) {
+@media(max-width: 1200px) {
   .app {
-    grid-template-columns:78px 245px minmax(360px,1fr) 260px;
+    grid-template-columns: 78px 245px minmax(0, 1fr);
   }
-  .topbar {
-    gap:14px;
-    padding:0 18px;
-  }
-  .tab {
-    padding:9px 11px;
-    font-size:15px;
-  }
-}
-@media(max-width:950px) {
-  .app {
-    grid-template-columns:66px 220px minmax(300px,1fr);
-  }
+
   .activity-panel {
-    display:none;
+    display: none;
   }
 }
-@media(max-width:650px) {
+
+@media(max-width: 760px) {
   .app {
-    grid-template-columns:58px minmax(0,1fr);
+    grid-template-columns: 60px minmax(0, 1fr);
   }
+
   .dm-sidebar {
-    display:none;
+    display: none;
   }
+
   .topbar {
-    padding:0 10px;
-    gap:7px;
+    padding: 0 12px;
+    gap: 8px;
   }
+
   .tab {
-    font-size:13px;
-    padding:7px 9px;
-  }
-  .empty-title {
-    font-size:18px;
-  }
-  .empty-description {
-    font-size:14px;
+    font-size: 13px;
+    padding: 8px;
   }
 }
 </style>
 </head>
 
 <body>
+
 <div class="app">
 
 <!-- SERVER RAIL -->
+
 <aside class="server-rail">
+
   <div class="home-tile">
-    <svg class="scene-logo" viewBox="0 0 40 48">
-      <path d="M34 4H19C11 4 6 10 6 18V24H25C28 24 29 27 26 29L6 44H21C29 44 34 38 34 30V24H15C12 24 11 21 14 19L34 4Z" fill="#7289da"/>
+    <svg class="scene-logo" viewBox="0 0 40 48"
+         xmlns="http://www.w3.org/2000/svg">
+      <path fill="#7289da"
+        d="M34 4H19C11 4 6 10 6 18V24H25C28 24 29 27 26 29L6 44H21C29 44 34 38 34 30V24H15C12 24 11 21 14 19L34 4Z"/>
     </svg>
   </div>
-  <div class="server-plus">+</div>
+
+  <div class="server-plus" aria-label="Add server">
+    <svg width="27" height="27" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor"
+         stroke-width="2.2" stroke-linecap="round">
+      <path d="M12 4v16M4 12h16"/>
+    </svg>
+  </div>
+
 </aside>
 
-<!-- LEFT SIDEBAR -->
+<!-- DM SIDEBAR -->
+
 <aside class="dm-sidebar">
 
   <header class="sidebar-heading">
     <span>scene</span>
-    <span class="chevron">⌄</span>
+
+    <svg class="dropdown" width="17" height="17"
+         viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2.5"
+         stroke-linecap="round" stroke-linejoin="round">
+      <path d="m7 10 5 5 5-5"/>
+    </svg>
   </header>
 
   <nav class="side-nav">
+
     <div class="side-item selected">
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
+
+      <!-- Friends icon -->
+      <svg viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="8" r="3.3" fill="currentColor" stroke="none"/>
+        <path d="M2.5 19v-1.5a6.5 6.5 0 0 1 13 0V19Z"
+              fill="currentColor" stroke="none"/>
+        <circle cx="17.2" cy="7.3" r="2.7" fill="currentColor" stroke="none"/>
+        <path d="M16.5 12.5c3.2 0 5 2 5 4.5v1.5h-3.8"/>
       </svg>
+
       Friends
     </div>
+
   </nav>
 
   <div class="dm-heading">
     <span>DIRECT MESSAGES</span>
-    <span class="dm-plus">+</span>
+
+    <svg width="20" height="20" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
   </div>
 
   <div class="dm-empty">
-    No direct messages<br>at this time.
+    No direct messages<br>
+    at this time.
   </div>
 
+  <!-- USER PANEL -->
+
   <footer class="account-bar">
-    <div class="account-avatar">
-      <svg viewBox="0 0 40 48">
-        <path d="M34 4H19C11 4 6 10 6 18V24H25C28 24 29 27 26 29L6 44H21C29 44 34 38 34 30V24H15C12 24 11 21 14 19L34 4Z" fill="#7289da"/>
-      </svg>
-    </div>
+
+    <div class="account-avatar">U</div>
+
     <div class="account-info">
       <div class="account-name">User</div>
       <div class="account-tag">#0000</div>
     </div>
+
     <div class="account-tools">
-      <span>♩</span><span>◖</span><span>⚙</span>
+
+      <!-- Mute -->
+      <svg viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 18a4 4 0 0 0 4-4V9"/>
+        <path d="M8 14V9a4 4 0 0 1 7-2.6"/>
+        <path d="M5 11v3a7 7 0 0 0 12.8 3.8"/>
+        <path d="m3 3 18 18"/>
+        <path d="m9 21 3 0"/>
+      </svg>
+
+      <!-- Headphones -->
+      <svg viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 13v-2a9 9 0 0 1 18 0v2"/>
+        <path d="M3 13h4v7H5a2 2 0 0 1-2-2Z"/>
+        <path d="M21 13h-4v7h2a2 2 0 0 0 2-2Z"/>
+      </svg>
+
+      <!-- Settings gear -->
+      <svg viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="m19.4 15 .1.1 1.4 1.1-1.5 2.6-1.7-.7a8 8 0 0 1-1.8 1l-.3 1.9h-3l-.3-1.9a8 8 0 0 1-1.8-1l-1.7.7-1.5-2.6 1.4-1.1a8 8 0 0 1 0-2l-1.4-1.1 1.5-2.6 1.7.7a8 8 0 0 1 1.8-1l.3-1.9h3l.3 1.9a8 8 0 0 1 1.8 1l1.7-.7 1.5 2.6-1.4 1.1a8 8 0 0 1 0 2Z"
+              transform="translate(-0.5 -0.5)"/>
+      </svg>
+
     </div>
+
   </footer>
+
 </aside>
 
-<!-- MAIN FRIENDS PAGE -->
+<!-- MAIN FRIENDS VIEW -->
+
 <main class="main-panel">
 
   <header class="topbar">
+
     <div class="page-title">
+
       <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M16 11a4 4 0 1 0-3.9-5A5 5 0 0 1 13 9c0 .7-.14 1.38-.4 2H16ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V21h12v-3.2C14 15.7 11.3 14 8 14Zm8-1c-.55 0-1.08.05-1.58.14 1.55.85 2.58 2.13 2.58 3.66V21h5v-3.2c0-2.1-2.7-4.8-6-4.8Z"/>
+        <circle cx="9" cy="8" r="3.5"/>
+        <path d="M2 19v-1.5a7 7 0 0 1 14 0V19Z"/>
+        <circle cx="17.5" cy="7.5" r="3"/>
+        <path d="M16 13c3.8 0 6 2.1 6 5v1h-3.8"/>
       </svg>
+
       Friends
+
     </div>
+
     <div class="tab current">Online</div>
     <div class="tab">All</div>
     <div class="tab">Pending</div>
     <div class="tab">Blocked</div>
+
     <div class="tab-separator"></div>
+
     <div class="tab add-friend">Add Friend</div>
+
   </header>
 
   <section class="friends-content">
+
     <div class="empty-state">
 
       <div class="illustration">
 
+        <!-- Background cloud -->
         <svg class="cloud-art" viewBox="0 0 700 240">
-          <path d="M65 192c-37 0-57-21-57-48 0-28 23-49 51-49 7-51 48-83 96-70 26-42 82-53 121-22 35-23 91-14 114 22 48-9 91 22 95 69 32 2 55 23 55 51 0 29-24 47-59 47H65Z" fill="#454750" opacity=".58"/>
+          <path d="M65 192c-37 0-57-21-57-48 0-28 23-49 51-49 7-51 48-83 96-70 26-42 82-53 121-22 35-23 91-14 114 22 48-9 91 22 95 69 32 2 55 23 55 51 0 29-24 47-59 47H65Z"
+                fill="#454750" opacity=".58"/>
         </svg>
 
-        <!-- YOUR UPLOADED VECTOR MASCOT -->
+        <!-- Your actual mascot SVG -->
         <img
           class="mascot-art"
           src="scene-mascot.svg"
-          alt="Gray scene mascot using a laptop"
+          alt="scene mascot"
         >
 
       </div>
@@ -471,33 +584,31 @@ body {
       </div>
 
     </div>
+
   </section>
+
 </main>
 
-<!-- RIGHT PANEL -->
+<!-- ACTIVE NOW -->
+
 <aside class="activity-panel">
 
   <h2 class="activity-title">Active Now</h2>
 
   <div class="activity-empty">
 
-    <svg class="sleepy-mascot" viewBox="0 0 190 125">
-      <ellipse cx="95" cy="105" rx="79" ry="9" fill="#454750" opacity=".65"/>
-      <path d="M35 87c-8-23 3-41 22-47L67 18q4-10 14-4l20 17 21-17q10-7 16 5l10 22q18 13 12 42-5 24-32 25H65Q42 108 35 87Z" fill="#777b84" stroke="#202225" stroke-width="4" stroke-linejoin="round"/>
-      <path d="M64 73q8 12 17 0M111 73q8 12 17 0" fill="none" stroke="#292b31" stroke-width="4" stroke-linecap="round"/>
-      <circle cx="96" cy="82" r="3" fill="#292b31"/>
-      <path d="M154 24l9-11m-2 21 12-4m-12 17 8 3" stroke="#858995" stroke-width="4" stroke-linecap="round"/>
-    </svg>
-
     <div class="activity-caption">
       It's quiet for now...
     </div>
 
-    <p class="activity-copy">
-      When a friend starts an activity—like playing a game or hanging out on voice—we'll show it here!
-    </p>
+    <div class="activity-copy">
+      When a friend starts an activity —
+      like playing a game or hanging out
+      on voice — we'll show it here!
+    </div>
 
   </div>
+
 </aside>
 
 </div>
