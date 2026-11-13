@@ -8,47 +8,65 @@
 <body>
     <!-- AUTHENTICATION SCREEN -->
     <div id="auth-screen" class="screen">
-        <div class="auth-box">
-            <h2>Welcome to Scene</h2>
-            <input type="text" id="auth-username" placeholder="Username (or User#0000)">
-            <input type="password" id="auth-password" placeholder="Password">
-            <button onclick="login()">Login</button>
-            <button onclick="register()" class="secondary">Create Account</button>
-            <p id="auth-error"></p>
+        <div class="auth-box" id="login-box">
+            <h2>Welcome Back</h2>
+            <p>We're so excited to see you again!</p>
+            <input type="text" id="login-username" placeholder="Username">
+            <input type="password" id="login-password" placeholder="Password">
+            <button onclick="login()">Log In</button>
+            <div class="auth-switch">Need an account? <span onclick="toggleAuth()">Register</span></div>
+            <p class="error-msg" id="login-error"></p>
+        </div>
+        
+        <div class="auth-box hidden" id="register-box">
+            <h2>Create an Account</h2>
+            <input type="text" id="reg-username" placeholder="Choose a Username">
+            <input type="password" id="reg-password" placeholder="Create a Password">
+            <button onclick="register()">Register</button>
+            <div class="auth-switch">Already have an account? <span onclick="toggleAuth()">Log In</span></div>
+            <p class="error-msg" id="reg-error"></p>
         </div>
     </div>
 
-    <!-- MAIN APP SCREEN -->
+    <!-- MAIN APP -->
     <div id="app-screen" class="screen hidden app-container">
         
         <!-- Far Left: Server List -->
         <nav class="server-list">
+            <div class="server-icon home-icon active" onclick="goHome()">🏠</div>
+            <div class="divider"></div>
             <div id="servers-container"></div>
             <div class="server-icon add-server" onclick="showModal('server-modal')">+</div>
         </nav>
 
-        <!-- Middle: Channel List -->
+        <!-- Middle: Sidebar -->
         <nav class="sidebar">
             <div class="sidebar-header">
-                <h2 id="current-server-name">Select a Server</h2>
+                <h2 id="sidebar-title">Direct Messages</h2>
+                <span id="server-settings-btn" class="hidden" onclick="showModal('server-settings-modal')">⚙️</span>
             </div>
-            <div class="channel-list" id="channels-container"></div>
-            <div id="add-channel-btn" class="add-channel hidden" onclick="showModal('channel-modal')">+ Add Channel (Owner)</div>
+            
+            <div class="channel-list" id="sidebar-list">
+                <!-- Channels or DMs go here -->
+            </div>
+
+            <div id="add-friend-btn" class="add-channel" onclick="showModal('friend-modal')">+ Add Friend</div>
+            <div id="add-channel-btn" class="add-channel hidden" onclick="showModal('channel-modal')">+ Add Channel</div>
             
             <div class="user-panel">
-                <div class="avatar">U</div>
+                <img id="my-pfp" src="" class="avatar">
                 <div class="user-info">
                     <div id="my-username">Username</div>
-                    <div id="my-discriminator">#0000</div>
+                    <div id="my-status" class="status">Online</div>
                 </div>
-                <button onclick="logout()">Log Out</button>
+                <button class="icon-btn" onclick="showModal('profile-modal')">⚙️</button>
             </div>
         </nav>
 
         <!-- Right: Chat Area -->
         <main class="chat-area">
             <header class="chat-header">
-                <h3 id="current-channel-name"># general</h3>
+                <h3 id="current-chat-name">Select a Chat</h3>
             </header>
             <div class="messages-container" id="messages-container"></div>
             <div class="input-area">
@@ -60,12 +78,50 @@
     </div>
 
     <!-- MODALS -->
+    <!-- Profile Settings Modal -->
+    <div id="profile-modal" class="modal hidden">
+        <div class="modal-content profile-settings">
+            <h3>User Settings</h3>
+            <label>Profile Picture URL</label>
+            <input type="text" id="set-pfp">
+            <label>Profile Banner URL or Color</label>
+            <input type="text" id="set-banner">
+            <label>Bio</label>
+            <input type="text" id="set-bio">
+            <label>Status (online, idle, dnd)</label>
+            <input type="text" id="set-status">
+            <button onclick="saveProfile()">Save Changes</button>
+            <button class="danger" onclick="logout()">Log Out completely</button>
+            <button onclick="hideModal('profile-modal')">Close</button>
+        </div>
+    </div>
+
+    <!-- Add Friend Modal -->
+    <div id="friend-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Add a Friend</h3>
+            <input type="text" id="friend-tag" placeholder="Username#0000">
+            <button onclick="addFriend()">Send Request</button>
+            <button onclick="hideModal('friend-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Create Server / Channel Modals... -->
     <div id="server-modal" class="modal hidden">
         <div class="modal-content">
             <h3>Create a Server</h3>
             <input type="text" id="new-server-name" placeholder="Server Name">
             <button onclick="createServer()">Create</button>
             <button onclick="hideModal('server-modal')">Cancel</button>
+        </div>
+    </div>
+    
+    <div id="server-settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Server Settings</h3>
+            <input type="text" id="edit-server-name" placeholder="New Server Name">
+            <button onclick="updateServer()">Save Server</button>
+            <button onclick="hideModal('server-settings-modal')">Cancel</button>
         </div>
     </div>
 
