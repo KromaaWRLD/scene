@@ -18,17 +18,18 @@ const User = mongoose.model('User', new mongoose.Schema({
     username: { type: String, required: true },
     discriminator: { type: String, required: true },
     password: { type: String, required: true },
-    pfp: { type: String, default: 'https://ui-avatars.com/api/?name=User&background=5865F2&color=fff' },
+    pfp: { type: String, default: 'https://ui-avatars.com/api/?name=U&background=5865F2&color=fff' },
     banner: { type: String, default: '#36393f' },
     bio: { type: String, default: "I'm new to Scene!" },
-    status: { type: String, default: 'online' },
+    status: { type: String, default: 'Online' },
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }));
 
 const Server = mongoose.model('Server', new mongoose.Schema({
     name: { type: String, required: true },
     icon: { type: String, default: '' },
-    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }] // Tracking who is in the server
 }));
 
 const Channel = mongoose.model('Channel', new mongoose.Schema({
@@ -43,7 +44,7 @@ const DM = mongoose.model('DM', new mongoose.Schema({
 const Message = mongoose.model('Message', new mongoose.Schema({
     content: { type: String, required: true },
     authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    targetId: { type: mongoose.Schema.Types.ObjectId }, // Can be Channel ID or DM ID
+    targetId: { type: mongoose.Schema.Types.ObjectId }, // Channel ID or DM ID
     timestamp: { type: Date, default: Date.now }
 }));
 
@@ -78,15 +79,18 @@ app.put('/api/users/:id', async (req, res) => {
 
 app.post('/api/friends/add', async (req, res) => {
     const { currentUserId, friendTag } = req.body;
+    if (!friendTag.includes('#')) return res.status(400).json({ error: "Include the #0000 tag!" });
+    
     const [name, disc] = friendTag.split('#');
     const friend = await User.findOne({ username: name, discriminator: disc });
+    
     if (!friend) return res.status(404).json({ error: "User not found!" });
     if (friend._id.toString() === currentUserId) return res.status(400).json({ error: "Can't add yourself!" });
 
     await User.findByIdAndUpdate(currentUserId, { $addToSet: { friends: friend._id } });
     await User.findByIdAndUpdate(friend._id, { $addToSet: { friends: currentUserId } });
     
-    // Create DM chat if it doesn't exist
+    // Create DM connection
     const existingDM = await DM.findOne({ participants: { $all: [currentUserId, friend._id] } });
     if (!existingDM) await new DM({ participants: [currentUserId, friend._id] }).save();
 
@@ -95,37 +99,61 @@ app.post('/api/friends/add', async (req, res) => {
 
 app.get('/api/users/:id/friends', async (req, res) => {
     const user = await User.findById(req.params.id).populate('friends', 'username discriminator pfp status');
-    // Get DMs to link them
     const dms = await DM.find({ participants: req.params.id });
     res.json({ friends: user.friends, dms });
 });
 
-// --- SERVER ROUTES ---
-app.get('/api/servers', async (req, res) => res.json(await Server.find()));
+// --- SERVER ROUTES (Isolated by User) ---
+app.get('/api/servers/user/:userId', async (req, res) => {
+    // Only return servers where the user is in the members array
+    const servers = await Server.find({ members: req.params.userId });
+    res.json(servers);
+});
+
 app.post('/api/servers', async (req, res) => {
     const { name, userId } = req.body;
-    const server = new Server({ name, ownerId: userId });
+    const server = new Server({ name, ownerId: userId, members: [userId] }); // Add creator to members
     await server.save();
     await new Channel({ name: 'general', serverId: server._id }).save();
     res.json(server);
 });
+
+// Join a server by ID
+app.post('/api/servers/join', async (req, res) => {
+    const { serverId, userId } = req.body;
+    try {
+        const server = await Server.findByIdAndUpdate(serverId, { $addToSet: { members: userId } }, { new: true });
+        if (!server) return res.status(404).json({ error: "Server not found!" });
+        res.json(server);
+    } catch (e) {
+        res.status(400).json({ error: "Invalid Server ID" });
+    }
+});
+
 app.put('/api/servers/:id', async (req, res) => {
     res.json(await Server.findByIdAndUpdate(req.params.id, req.body, { new: true }));
 });
-app.get('/api/servers/:serverId/channels', async (req, res) => res.json(await Channel.find({ serverId: req.params.serverId })));
+
+app.get('/api/servers/:serverId/channels', async (req, res) => {
+    res.json(await Channel.find({ serverId: req.params.serverId }));
+});
+
 app.post('/api/servers/:serverId/channels', async (req, res) => {
     res.json(await new Channel({ name: req.body.name, serverId: req.params.serverId }).save());
 });
 
-// --- MESSAGE ROUTES (Works for Channels & DMs) ---
+// --- MESSAGE ROUTES ---
 app.get('/api/messages/:targetId', async (req, res) => {
-    const messages = await Message.find({ targetId: req.params.targetId }).populate('authorId', 'username discriminator pfp');
+    // Fetch messages and populate ALL profile data for the clickable modal
+    const messages = await Message.find({ targetId: req.params.targetId })
+                                  .populate('authorId', 'username discriminator pfp banner bio status');
     res.json(messages);
 });
+
 app.post('/api/messages/:targetId', async (req, res) => {
     const msg = new Message({ content: req.body.content, authorId: req.body.userId, targetId: req.params.targetId });
     await msg.save();
-    res.json(await Message.findById(msg._id).populate('authorId', 'username discriminator pfp'));
+    res.json(await Message.findById(msg._id).populate('authorId', 'username discriminator pfp banner bio status'));
 });
 
 app.listen(3000, () => console.log(`Server running on port 3000`));
