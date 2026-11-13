@@ -171,3 +171,53 @@ body {
 #message-input::placeholder {
     color: #72767d;
 }
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidden; }
+.hidden { display: none !important; }
+.screen { height: 100vh; width: 100vw; display: flex; }
+
+/* Auth Screen */
+#auth-screen { align-items: center; justify-content: center; background: #2f3136; }
+.auth-box { background: #36393f; padding: 32px; border-radius: 8px; width: 400px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+.auth-box input { padding: 12px; border-radius: 4px; border: none; background: #202225; color: white; }
+.auth-box button { padding: 12px; background: #5865F2; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+.auth-box button.secondary { background: #4f545c; }
+#auth-error { color: #ed4245; font-size: 14px; text-align: center; }
+
+/* App Layout */
+.server-list { width: 72px; background-color: #202225; display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 8px; overflow-y: auto; }
+.server-icon { width: 48px; height: 48px; background-color: #36393f; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; color: white; font-weight: bold; transition: 0.2s; }
+.server-icon:hover, .server-icon.active { border-radius: 16px; background-color: #5865F2; }
+.add-server { background-color: #36393f; color: #43b581; font-size: 24px; }
+.add-server:hover { background-color: #43b581; color: white; }
+
+.sidebar { width: 240px; background-color: #2f3136; display: flex; flex-direction: column; }
+.sidebar-header { padding: 16px; border-bottom: 1px solid #202225; }
+.channel-list { flex: 1; padding: 8px; overflow-y: auto; }
+.channel { padding: 8px; cursor: pointer; border-radius: 4px; color: #8e9297; display: flex; align-items: center; gap: 8px; }
+.channel:hover, .channel.active { background: #393c43; color: white; }
+.add-channel { padding: 8px; color: #43b581; cursor: pointer; text-align: center; font-size: 14px; }
+
+.user-panel { background: #292b2f; padding: 12px; display: flex; align-items: center; gap: 8px; }
+.avatar { width: 32px; height: 32px; background: #5865F2; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; }
+.user-info { flex: 1; font-size: 14px; }
+#my-discriminator { font-size: 12px; color: #b9bbbe; }
+.user-panel button { background: #ed4245; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+/* Chat Area */
+.chat-area { flex: 1; display: flex; flex-direction: column; background-color: #36393f; }
+.chat-header { padding: 16px; border-bottom: 1px solid #202225; }
+.messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.message { display: flex; gap: 16px; }
+.message-header { display: flex; gap: 8px; align-items: baseline; }
+.message-header .username { color: white; font-weight: bold; }
+.message-header .disc { color: #72767d; font-size: 12px; }
+.input-area { padding: 16px; }
+#message-input { width: 100%; padding: 12px; background: #40444b; border: none; border-radius: 8px; color: white; outline: none; }
+
+/* Modals */
+.modal { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; }
+.modal-content { background: #36393f; padding: 24px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px; width: 300px; }
+.modal-content input { padding: 8px; background: #202225; border: none; color: white; border-radius: 4px; }
+.modal-content button { padding: 8px; background: #5865F2; border: none; color: white; border-radius: 4px; cursor: pointer; }
