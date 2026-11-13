@@ -13,17 +13,22 @@ app.use(express.static(__dirname));
 const mongoURI = "mongodb+srv://27johnballenger2_db_user:hm398KIfJh0lX98E@cluster0.nkbek9a.mongodb.net/scene_db?retryWrites=true&w=majority";
 mongoose.connect(mongoURI).then(() => console.log('MongoDB Connected')).catch(err => console.log(err));
 
-// --- DATABASE SCHEMAS ---
+// --- SCHEMAS ---
 const User = mongoose.model('User', new mongoose.Schema({
     username: { type: String, required: true },
-    discriminator: { type: String, required: true }, // The #0000 part
-    password: { type: String, required: true }
+    discriminator: { type: String, required: true },
+    password: { type: String, required: true },
+    pfp: { type: String, default: 'https://ui-avatars.com/api/?name=User&background=5865F2&color=fff' },
+    banner: { type: String, default: '#36393f' },
+    bio: { type: String, default: "I'm new to Scene!" },
+    status: { type: String, default: 'online' },
+    friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }));
 
 const Server = mongoose.model('Server', new mongoose.Schema({
     name: { type: String, required: true },
-    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    icon: { type: String, default: '' },
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }));
 
 const Channel = mongoose.model('Channel', new mongoose.Schema({
@@ -31,90 +36,96 @@ const Channel = mongoose.model('Channel', new mongoose.Schema({
     serverId: { type: mongoose.Schema.Types.ObjectId, ref: 'Server' }
 }));
 
+const DM = mongoose.model('DM', new mongoose.Schema({
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+}));
+
 const Message = mongoose.model('Message', new mongoose.Schema({
     content: { type: String, required: true },
     authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    channelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Channel' },
+    targetId: { type: mongoose.Schema.Types.ObjectId }, // Can be Channel ID or DM ID
     timestamp: { type: Date, default: Date.now }
 }));
 
-// --- AUTHENTICATION ROUTES ---
+// --- AUTH ROUTES ---
 app.post('/api/register', async (req, res) => {
     const { username, password } = req.body;
-    // Generate random 4-digit discriminator
     let discriminator = Math.floor(1000 + Math.random() * 9000).toString();
-    
-    // Make sure Username#Discriminator is unique
     while(await User.findOne({ username, discriminator })) {
         discriminator = Math.floor(1000 + Math.random() * 9000).toString();
     }
-
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ username, discriminator, password: hashedPassword });
+    const pfp = `https://ui-avatars.com/api/?name=${username}&background=5865F2&color=fff`;
+    const user = new User({ username, discriminator, password: hashedPassword, pfp });
     await user.save();
-    res.json({ _id: user._id, username: user.username, discriminator: user.discriminator });
+    res.json(user);
 });
 
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
-    // User might type Username#1234 or just Username
-    const [name, disc] = username.split('#');
-    const query = disc ? { username: name, discriminator: disc } : { username: name };
-    
-    const user = await User.findOne(query);
+    const user = await User.findOne({ username });
     if (!user || !(await bcrypt.compare(password, user.password))) {
-        return res.status(401).json({ error: "Invalid credentials" });
+        return res.status(401).json({ error: "Invalid username or password" });
     }
-    res.json({ _id: user._id, username: user.username, discriminator: user.discriminator });
+    res.json(user);
 });
 
-// --- SERVER & CHANNEL ROUTES ---
-app.get('/api/servers', async (req, res) => {
-    const servers = await Server.find();
-    res.json(servers);
+// --- USER & FRIEND ROUTES ---
+app.put('/api/users/:id', async (req, res) => {
+    const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updatedUser);
 });
 
+app.post('/api/friends/add', async (req, res) => {
+    const { currentUserId, friendTag } = req.body;
+    const [name, disc] = friendTag.split('#');
+    const friend = await User.findOne({ username: name, discriminator: disc });
+    if (!friend) return res.status(404).json({ error: "User not found!" });
+    if (friend._id.toString() === currentUserId) return res.status(400).json({ error: "Can't add yourself!" });
+
+    await User.findByIdAndUpdate(currentUserId, { $addToSet: { friends: friend._id } });
+    await User.findByIdAndUpdate(friend._id, { $addToSet: { friends: currentUserId } });
+    
+    // Create DM chat if it doesn't exist
+    const existingDM = await DM.findOne({ participants: { $all: [currentUserId, friend._id] } });
+    if (!existingDM) await new DM({ participants: [currentUserId, friend._id] }).save();
+
+    res.json({ success: true });
+});
+
+app.get('/api/users/:id/friends', async (req, res) => {
+    const user = await User.findById(req.params.id).populate('friends', 'username discriminator pfp status');
+    // Get DMs to link them
+    const dms = await DM.find({ participants: req.params.id });
+    res.json({ friends: user.friends, dms });
+});
+
+// --- SERVER ROUTES ---
+app.get('/api/servers', async (req, res) => res.json(await Server.find()));
 app.post('/api/servers', async (req, res) => {
     const { name, userId } = req.body;
-    const server = new Server({ name, ownerId: userId, members: [userId] });
+    const server = new Server({ name, ownerId: userId });
     await server.save();
-    // Auto-create a general channel
     await new Channel({ name: 'general', serverId: server._id }).save();
     res.json(server);
 });
-
-app.get('/api/servers/:serverId/channels', async (req, res) => {
-    const channels = await Channel.find({ serverId: req.params.serverId });
-    res.json(channels);
+app.put('/api/servers/:id', async (req, res) => {
+    res.json(await Server.findByIdAndUpdate(req.params.id, req.body, { new: true }));
 });
-
+app.get('/api/servers/:serverId/channels', async (req, res) => res.json(await Channel.find({ serverId: req.params.serverId })));
 app.post('/api/servers/:serverId/channels', async (req, res) => {
-    const { name, userId } = req.body;
-    const server = await Server.findById(req.params.serverId);
-    
-    // Basic Permissions: Only Owner can create channels
-    if (server.ownerId.toString() !== userId) {
-        return res.status(403).json({ error: "Only the server owner can create channels." });
-    }
-
-    const channel = new Channel({ name, serverId: req.params.serverId });
-    await channel.save();
-    res.json(channel);
+    res.json(await new Channel({ name: req.body.name, serverId: req.params.serverId }).save());
 });
 
-// --- MESSAGE ROUTES ---
-app.get('/api/channels/:channelId/messages', async (req, res) => {
-    const messages = await Message.find({ channelId: req.params.channelId }).populate('authorId', 'username discriminator');
+// --- MESSAGE ROUTES (Works for Channels & DMs) ---
+app.get('/api/messages/:targetId', async (req, res) => {
+    const messages = await Message.find({ targetId: req.params.targetId }).populate('authorId', 'username discriminator pfp');
     res.json(messages);
 });
-
-app.post('/api/channels/:channelId/messages', async (req, res) => {
-    const { content, userId } = req.body;
-    const msg = new Message({ content, authorId: userId, channelId: req.params.channelId });
+app.post('/api/messages/:targetId', async (req, res) => {
+    const msg = new Message({ content: req.body.content, authorId: req.body.userId, targetId: req.params.targetId });
     await msg.save();
-    const populatedMsg = await Message.findById(msg._id).populate('authorId', 'username discriminator');
-    res.json(populatedMsg);
+    res.json(await Message.findById(msg._id).populate('authorId', 'username discriminator pfp'));
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(3000, () => console.log(`Server running on port 3000`));
