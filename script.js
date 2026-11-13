@@ -1,18 +1,15 @@
 const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api';
 let currentUser = JSON.parse(localStorage.getItem('scene_user'));
-let currentTargetId = null; // Can be a Channel ID or DM ID
+let currentTargetId = null;
 let messageInterval = null;
-let serverList = [];
-let dmsList = [];
 
 if (currentUser) showApp();
 
-// --- AUTH LOGIC (Less Confusing) ---
+// --- AUTH LOGIC ---
 function toggleAuth() {
     document.getElementById('login-box').classList.toggle('hidden');
     document.getElementById('register-box').classList.toggle('hidden');
 }
-
 async function login() {
     const user = document.getElementById('login-username').value;
     const pass = document.getElementById('login-password').value;
@@ -21,7 +18,6 @@ async function login() {
     if (data.error) return document.getElementById('login-error').innerText = data.error;
     loginSuccess(data);
 }
-
 async function register() {
     const user = document.getElementById('reg-username').value;
     const pass = document.getElementById('reg-password').value;
@@ -30,33 +26,29 @@ async function register() {
     if (data.error) return document.getElementById('reg-error').innerText = data.error;
     loginSuccess(data);
 }
-
 function loginSuccess(user) {
     currentUser = user;
     localStorage.setItem('scene_user', JSON.stringify(user));
     showApp();
 }
-
 function logout() {
     localStorage.removeItem('scene_user');
     location.reload();
 }
-
 function showApp() {
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('app-screen').classList.remove('hidden');
     updateUserPanel();
     loadServers();
-    goHome(); // Load DMs by default
+    goHome();
 }
 
-// --- PROFILE SETTINGS ---
+// --- PROFILE LOGIC ---
 function updateUserPanel() {
-    document.getElementById('my-username').innerText = `${currentUser.username}#${currentUser.discriminator}`;
+    document.getElementById('my-username').innerText = currentUser.username;
     document.getElementById('my-status').innerText = currentUser.status || 'Online';
     document.getElementById('my-pfp').src = currentUser.pfp;
     
-    // Fill settings modal
     document.getElementById('set-pfp').value = currentUser.pfp;
     document.getElementById('set-banner').value = currentUser.banner;
     document.getElementById('set-bio').value = currentUser.bio;
@@ -71,16 +63,35 @@ async function saveProfile() {
         status: document.getElementById('set-status').value
     };
     const res = await fetch(`${API_URL}/users/${currentUser._id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates)
     });
     currentUser = await res.json();
     localStorage.setItem('scene_user', JSON.stringify(currentUser));
     updateUserPanel();
-    hideModal('profile-modal');
+    hideModal('my-settings-modal');
 }
 
-// --- NAVIGATION & HOME (DMs) ---
+// View other user's profile
+window.showUserProfile = function(userStr) {
+    const user = JSON.parse(decodeURIComponent(userStr));
+    document.getElementById('view-username').innerText = user.username;
+    document.getElementById('view-disc').innerText = `#${user.discriminator}`;
+    document.getElementById('view-pfp').src = user.pfp;
+    document.getElementById('view-status').innerText = user.status;
+    document.getElementById('view-bio').innerText = user.bio;
+    
+    const bannerEl = document.getElementById('view-banner');
+    if(user.banner.startsWith('http')) {
+        bannerEl.style.backgroundImage = `url(${user.banner})`;
+        bannerEl.style.backgroundColor = 'transparent';
+    } else {
+        bannerEl.style.backgroundImage = 'none';
+        bannerEl.style.backgroundColor = user.banner;
+    }
+    showModal('view-profile-modal');
+}
+
+// --- NAVIGATION & FRIENDS ---
 async function goHome() {
     document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
     document.querySelector('.home-icon').classList.add('active');
@@ -90,20 +101,21 @@ async function goHome() {
     document.getElementById('add-channel-btn').classList.add('hidden');
     document.getElementById('server-settings-btn').classList.add('hidden');
     
-    // Fetch friends & DMs
     const res = await fetch(`${API_URL}/users/${currentUser._id}/friends`);
     const data = await res.json();
-    
     const list = document.getElementById('sidebar-list');
     list.innerHTML = '';
     
     data.friends.forEach(friend => {
-        // Find the DM id for this friend
         const dm = data.dms.find(d => d.participants.includes(friend._id));
         const div = document.createElement('div');
         div.className = 'list-item';
         div.innerHTML = `<img src="${friend.pfp}" class="avatar" style="width:24px;height:24px;"> ${friend.username}`;
-        div.onclick = () => selectChat(dm._id, `@${friend.username}`);
+        div.onclick = (e) => {
+            document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            selectChat(dm._id, `@${friend.username}`);
+        };
         list.appendChild(div);
     });
 }
@@ -122,18 +134,18 @@ async function addFriend() {
 
 // --- SERVERS & CHANNELS ---
 async function loadServers() {
-    const res = await fetch(`${API_URL}/servers`);
-    serverList = await res.json();
+    // Only fetch servers you are a member of!
+    const res = await fetch(`${API_URL}/servers/user/${currentUser._id}`);
+    const servers = await res.json();
     const container = document.getElementById('servers-container');
     container.innerHTML = '';
-    serverList.forEach(server => {
+    
+    servers.forEach(server => {
         const div = document.createElement('div');
         div.className = 'server-icon';
-        if (server.icon) {
-            div.style.backgroundImage = `url(${server.icon})`;
-        } else {
-            div.innerText = server.name.charAt(0).toUpperCase();
-        }
+        if (server.icon) { div.style.backgroundImage = `url(${server.icon})`; } 
+        else { div.innerText = server.name.charAt(0).toUpperCase(); }
+        
         div.onclick = (e) => {
             document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
             e.target.classList.add('active');
@@ -153,8 +165,20 @@ async function createServer() {
     loadServers();
 }
 
+async function joinServer() {
+    const serverId = document.getElementById('join-server-id').value;
+    const res = await fetch(`${API_URL}/servers/join`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverId, userId: currentUser._id })
+    });
+    const data = await res.json();
+    if(data.error) alert(data.error);
+    hideModal('join-server-modal');
+    loadServers();
+}
+
 let activeServer = null;
-function selectServer(server) {
+async function selectServer(server) {
     activeServer = server;
     document.getElementById('sidebar-title').innerText = server.name;
     document.getElementById('add-friend-btn').classList.add('hidden');
@@ -163,15 +187,16 @@ function selectServer(server) {
     document.getElementById('add-channel-btn').classList.toggle('hidden', !isOwner);
     document.getElementById('server-settings-btn').classList.toggle('hidden', !isOwner);
     
+    document.getElementById('server-id-display').innerText = server._id; // Show ID for invites
     document.getElementById('edit-server-name').value = server.name;
-    loadChannels(server._id);
+    
+    await loadChannels(server._id);
 }
 
 async function updateServer() {
     const newName = document.getElementById('edit-server-name').value;
     await fetch(`${API_URL}/servers/${activeServer._id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName })
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName })
     });
     hideModal('server-settings-modal');
     loadServers();
@@ -183,26 +208,36 @@ async function loadChannels(serverId) {
     const channels = await res.json();
     const list = document.getElementById('sidebar-list');
     list.innerHTML = '';
-    channels.forEach(channel => {
+    
+    channels.forEach((channel, index) => {
         const div = document.createElement('div');
         div.className = 'list-item';
-        div.innerText = `# ${channel.name}`;
-        div.onclick = () => selectChat(channel._id, `# ${channel.name}`);
+        div.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> ${channel.name}`;
+        div.onclick = (e) => {
+            document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            selectChat(channel._id, `# ${channel.name}`);
+        };
         list.appendChild(div);
+        
+        // AUTO-SELECT FIRST CHANNEL
+        if(index === 0) {
+            div.classList.add('active');
+            selectChat(channel._id, `# ${channel.name}`);
+        }
     });
 }
 
 async function createChannel() {
     const name = document.getElementById('new-channel-name').value;
     await fetch(`${API_URL}/servers/${activeServer._id}/channels`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
     });
     hideModal('channel-modal');
     loadChannels(activeServer._id);
 }
 
-// --- MESSAGING ---
+// --- MESSAGES ---
 function selectChat(targetId, chatName) {
     currentTargetId = targetId;
     document.getElementById('current-chat-name').innerText = chatName;
@@ -218,16 +253,20 @@ async function loadMessages() {
     const res = await fetch(`${API_URL}/messages/${currentTargetId}`);
     const messages = await res.json();
     const container = document.getElementById('messages-container');
-    container.innerHTML = '';
     
+    // Check if scrolled to bottom before appending to keep position
+    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+    
+    container.innerHTML = '';
     messages.forEach(msg => {
+        const userStr = encodeURIComponent(JSON.stringify(msg.authorId));
         const div = document.createElement('div');
         div.className = 'message';
         div.innerHTML = `
-            <img src="${msg.authorId.pfp}" class="avatar">
+            <img src="${msg.authorId.pfp}" class="avatar" onclick="showUserProfile('${userStr}')">
             <div>
                 <div class="message-header">
-                    <span class="username">${msg.authorId.username}</span>
+                    <span class="username" onclick="showUserProfile('${userStr}')">${msg.authorId.username}</span>
                     <span class="disc">#${msg.authorId.discriminator}</span>
                 </div>
                 <div class="text">${msg.content}</div>
@@ -235,7 +274,8 @@ async function loadMessages() {
         `;
         container.appendChild(div);
     });
-    container.scrollTop = container.scrollHeight;
+    
+    if(isAtBottom) container.scrollTop = container.scrollHeight;
 }
 
 document.getElementById('message-form').addEventListener('submit', async (e) => {
@@ -250,6 +290,7 @@ document.getElementById('message-form').addEventListener('submit', async (e) => 
     
     input.value = '';
     loadMessages();
+    document.getElementById('messages-container').scrollTop = document.getElementById('messages-container').scrollHeight;
 });
 
 function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
