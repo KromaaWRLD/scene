@@ -159,8 +159,8 @@
         </div>
     </div>
 
-    <!-- View Profile Modal -->
-    <div id="view-profile-modal" class="modal hidden">
+    <!-- POPOUT View Profile Modal (Modified to not block screen) -->
+    <div id="view-profile-modal" class="profile-popout hidden">
         <div class="profile-card" style="margin: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
             <div class="profile-banner" id="view-banner"></div>
             <div class="avatar-wrapper profile-avatar-wrapper">
@@ -191,7 +191,13 @@
 
     <!-- Small Modals -->
     <div id="server-modal" class="modal hidden"><div class="modal-content"><h3>Create Server</h3><input type="text" id="new-server-name" placeholder="Name"><button onclick="createServer()">Create</button><button onclick="hideModal('server-modal')">Cancel</button></div></div>
-    <div id="channel-modal" class="modal hidden"><div class="modal-content"><h3>Create Channel</h3><input type="text" id="new-channel-name" placeholder="Name"><button onclick="createChannel()">Create</button><button onclick="hideModal('channel-modal')">Cancel</button></div></div>
+    
+    <!-- ADDED LOCKED CHANNEL CHECKBOX -->
+    <div id="channel-modal" class="modal hidden"><div class="modal-content"><h3>Create Channel</h3><input type="text" id="new-channel-name" placeholder="Name">
+        <label style="color:#b9bbbe; font-size:14px; display:flex; align-items:center; gap:8px; margin-top:8px;">
+            <input type="checkbox" id="new-channel-locked"> Locked Channel (Admins & You)
+        </label>
+        <button onclick="createChannel()">Create</button><button onclick="hideModal('channel-modal')">Cancel</button></div></div>
     <div id="friend-modal" class="modal hidden"><div class="modal-content"><h3>Add Friend</h3><input type="text" id="friend-tag" placeholder="User#0000"><button onclick="addFriend()">Send</button><button onclick="hideModal('friend-modal')">Cancel</button></div></div>
 
     <script src="script.js"></script>
