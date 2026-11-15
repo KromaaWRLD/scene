@@ -7,6 +7,7 @@ let replyingToId = null;
 
 window.userCache = {}; 
 window.currentServerMembers = [];
+window.currentProfileUserTag = null; // Store tag to send friend request
 
 const verifiedSVG = `<svg class="verified-badge verified-svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor"/><path d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -94,21 +95,19 @@ function showSettingsPane(id) {
     document.querySelectorAll('.settings-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(id).classList.remove('hidden');
     
-    // Add active class to whatever clicked tab triggered this
     if (event && event.target && event.target.classList) {
         event.target.classList.add('active');
     }
     if(id === 'settings-admin-panel') loadAdminPanel();
 }
 
-// FIXED: Isolate "User Settings" from "Server Settings" UI logic
 function openUserSettings() {
     document.getElementById('settings-screen').classList.remove('hidden');
     document.getElementById('settings-header').innerText = "USER SETTINGS";
     
     document.getElementById('tab-my-account').style.display = 'block';
     if(currentUser.isAdmin) document.getElementById('tab-admin').style.display = 'block';
-    document.getElementById('tab-server').style.display = 'none'; // Hide Server tab
+    document.getElementById('tab-server').style.display = 'none'; 
     
     showSettingsPane('settings-user-panel');
     document.getElementById('tab-my-account').classList.add('active');
@@ -132,7 +131,7 @@ function openServerSettings() {
     
     document.getElementById('tab-my-account').style.display = 'none';
     document.getElementById('tab-admin').style.display = 'none';
-    document.getElementById('tab-server').style.display = 'block'; // Show Server tab
+    document.getElementById('tab-server').style.display = 'block'; 
     
     showSettingsPane('settings-server-panel');
     document.getElementById('tab-server').classList.add('active');
@@ -195,27 +194,22 @@ async function adminToggleVerify(id, status) { await fetch(`${API_URL}/admin/ser
 async function adminToggleVerifyUser(id, status) { await fetch(`${API_URL}/admin/users/verify/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ isVerified: status }) }); loadAdminPanel(); }
 
 
-// --- PROFILES ---
+// --- PROFILES & FRIEND REQUESTS ---
 window.showUserProfile = function(event, userId) {
-    // FIX: Stop propagation so the global click listener doesn't immediately close it
     event.stopPropagation();
-    
     const user = window.userCache[userId];
     if(!user) return;
     
-    document.getElementById('view-username').innerText = user.username;
-    document.getElementById('view-disc').innerText = `#${user.discriminator}`;
-    document.getElementById('view-pfp').src = user.pfp;
+    window.currentProfileUserTag = `${user.username}#${user.discriminator}`;
     
-    // Add verification checkmark
-    document.getElementById('view-verified-badge').innerHTML = user.isVerified ? verifiedSVG : '';
+    document.getElementById('view-username').innerHTML = `${user.username}<span id="view-disc">#${user.discriminator}</span> ${user.isVerified ? verifiedSVG : ''}`;
+    document.getElementById('view-pfp').src = user.pfp;
     
     let statusText = user.customStatus || user.activity.charAt(0).toUpperCase() + user.activity.slice(1);
     document.getElementById('view-status').innerText = statusText;
     document.getElementById('view-activity-dot').className = `status-dot large ${user.activity}`;
     document.getElementById('view-bio').innerText = user.bio || '';
     
-    // Render Badges
     const badgeContainer = document.getElementById('view-badges');
     badgeContainer.innerHTML = '';
     if(user.badges && user.badges.length > 0) {
@@ -227,6 +221,16 @@ window.showUserProfile = function(event, userId) {
         bannerEl.style.backgroundImage = `url(${user.banner})`; bannerEl.style.backgroundColor = 'transparent';
     } else {
         bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = user.banner || '#36393f';
+    }
+
+    // Toggle Friend Request Button
+    const addBtn = document.getElementById('view-add-friend-btn');
+    if (user._id === currentUser._id) {
+        addBtn.classList.add('hidden'); // Hide if self
+    } else {
+        addBtn.classList.remove('hidden');
+        addBtn.innerText = "Send Friend Request";
+        addBtn.style.background = "#43b581";
     }
     
     const modal = document.getElementById('view-profile-modal');
@@ -241,7 +245,23 @@ window.showUserProfile = function(event, userId) {
     modal.style.top = y + 'px';
 }
 
-// Global Click Closer (FIXED target logic)
+window.sendFriendRequestFromProfile = async function() {
+    if(!window.currentProfileUserTag) return;
+    const btn = document.getElementById('view-add-friend-btn');
+    btn.innerText = "Sent!";
+    btn.style.background = "#3ba55c"; // Success green
+    
+    await fetch(`${API_URL}/friends/add`, { 
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify({ currentUserId: currentUser._id, friendTag: window.currentProfileUserTag }) 
+    });
+    
+    // Refresh sidebar if we are in Home
+    if (!activeServer) goHome();
+}
+
+// Global Click Closer
 document.addEventListener('click', (e) => {
     const profileModal = document.getElementById('view-profile-modal');
     if(profileModal && !profileModal.classList.contains('hidden') && !e.target.closest('#view-profile-modal')) {
@@ -271,7 +291,6 @@ async function goHome() {
     document.getElementById('server-settings-btn').classList.add('hidden');
     document.getElementById('member-list').classList.add('hidden');
     document.getElementById('current-chat-topic').innerText = ""; 
-    document.getElementById('messages-container').innerHTML = '';
     
     const res = await fetch(`${API_URL}/users/${currentUser._id}/friends`);
     const data = await res.json();
@@ -298,6 +317,7 @@ async function goHome() {
     } else {
         document.getElementById('current-chat-name').innerText = "No Friends Yet";
         currentTargetId = null;
+        document.getElementById('messages-container').innerHTML = '';
     }
 }
 
@@ -325,7 +345,6 @@ async function selectServer(server) {
     document.getElementById('add-channel-btn').classList.toggle('hidden', !isOwner && !isSysAdmin);
     document.getElementById('server-settings-btn').classList.toggle('hidden', !isOwner && !isSysAdmin);
     document.getElementById('member-list').classList.remove('hidden');
-    document.getElementById('messages-container').innerHTML = ''; 
     
     loadChannels(server._id);
     loadMembers(server._id);
@@ -385,6 +404,7 @@ async function loadChannels(serverId) {
         document.getElementById('current-chat-name').innerText = "No Channels Available";
         document.getElementById('current-chat-topic').innerText = "";
         currentTargetId = null;
+        document.getElementById('messages-container').innerHTML = '';
     }
 }
 
@@ -404,13 +424,19 @@ async function loadMembers(serverId) {
 
 // --- MESSAGES ---
 function selectChat(targetId, chatName, topic = "") {
+    if (currentTargetId === targetId) return; // SMOOTH SWAP: Don't reload if already here
+    
     currentTargetId = targetId;
     document.getElementById('current-chat-name').innerText = chatName;
     document.getElementById('current-chat-topic').innerText = topic;
     document.getElementById('message-input').disabled = false;
     cancelReply();
-    loadMessages(true);
+    
+    // SMOOTH SWAP: Show loading placeholder instantly instead of flashing empty
+    document.getElementById('messages-container').innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#72767d;">Loading messages...</div>`;
+    
     if (messageInterval) clearInterval(messageInterval);
+    loadMessages(true); // network fetch
     messageInterval = setInterval(() => loadMessages(false), 2000);
 }
 
@@ -438,7 +464,7 @@ async function loadMessages(forceScroll = false) {
     const container = document.getElementById('messages-container');
     const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
     
-    container.innerHTML = '';
+    container.innerHTML = ''; // Clear loading screen on successful fetch
     messages.forEach(msg => {
         window.userCache[msg.authorId._id] = msg.authorId;
         const time = new Date(msg.timestamp).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute:'2-digit' });
