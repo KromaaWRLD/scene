@@ -22,7 +22,8 @@ const User = mongoose.model('User', new mongoose.Schema({
     activity: { type: String, default: 'online' },
     customStatus: { type: String, default: '' },
     badges: { type: [String], default: ['Early Supporter'] },
-    isAdmin: { type: Boolean, default: false }, 
+    isAdmin: { type: Boolean, default: false }, // Default to false
+    isVerified: { type: Boolean, default: false }, // User verification
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }));
 
@@ -32,7 +33,7 @@ const Server = mongoose.model('Server', new mongoose.Schema({
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     inviteCode: { type: String, unique: true },
-    isVerified: { type: Boolean, default: false }
+    isVerified: { type: Boolean, default: false } // Server verification
 }));
 
 const Channel = mongoose.model('Channel', new mongoose.Schema({
@@ -65,21 +66,20 @@ app.post('/api/register', async (req, res) => {
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const pfp = `https://ui-avatars.com/api/?name=${username}&background=5865F2&color=fff`;
-    const user = new User({ username, discriminator, password: hashedPassword, pfp });
     
-    // HARDCODED ADMIN
-    if (username.toLowerCase() === "die" && discriminator === "4252") {
-        user.isAdmin = true;
-    }
+    // HARDCODED ADMIN LOGIC
+    const isAdmin = (username.toLowerCase() === "die" && discriminator === "4252");
     
+    const user = new User({ username, discriminator, password: hashedPassword, pfp, isAdmin });
     await user.save();
     res.json(user);
 });
+
 app.post('/api/login', async (req, res) => {
     const user = await User.findOne({ username: req.body.username });
     if (!user || !(await bcrypt.compare(req.body.password, user.password))) return res.status(401).json({ error: "Invalid credentials" });
     
-    // ENSURE ADMIN
+    // ENSURE HARDCODED ADMIN PERSISTS
     if (user.username.toLowerCase() === "die" && user.discriminator === "4252" && !user.isAdmin) {
         user.isAdmin = true;
         await user.save();
@@ -92,7 +92,7 @@ app.put('/api/users/:id', async (req, res) => {
     res.json(await User.findByIdAndUpdate(req.params.id, req.body, { new: true }));
 });
 app.get('/api/users/:id/friends', async (req, res) => {
-    const user = await User.findById(req.params.id).populate('friends', 'username discriminator pfp activity customStatus');
+    const user = await User.findById(req.params.id).populate('friends', 'username discriminator pfp activity customStatus isVerified');
     const dms = await DM.find({ participants: req.params.id });
     res.json({ friends: user.friends, dms });
 });
@@ -143,14 +143,14 @@ app.delete('/api/channels/:id', async (req, res) => {
     res.json({ success: true });
 });
 app.get('/api/servers/:serverId/members', async (req, res) => {
-    const server = await Server.findById(req.params.serverId).populate('members', 'username discriminator pfp activity customStatus badges');
+    const server = await Server.findById(req.params.serverId).populate('members', 'username discriminator pfp activity customStatus badges isVerified');
     res.json(server.members);
 });
 
 // --- MESSAGES ---
 app.get('/api/messages/:targetId', async (req, res) => {
     const messages = await Message.find({ targetId: req.params.targetId })
-        .populate('authorId', 'username discriminator pfp banner bio activity customStatus badges')
+        .populate('authorId', 'username discriminator pfp banner bio activity customStatus badges isVerified')
         .populate({ path: 'replyTo', populate: { path: 'authorId', select: 'username pfp' }});
     res.json(messages);
 });
@@ -163,9 +163,13 @@ app.put('/api/messages/edit/:msgId', async (req, res) => res.json(await Message.
 app.delete('/api/messages/:msgId', async (req, res) => { await Message.findByIdAndDelete(req.params.msgId); res.json({ success: true }); });
 
 // --- ADMIN ROUTES ---
-app.get('/api/admin/users', async (req, res) => res.json(await User.find({}, 'username discriminator pfp isAdmin')));
+app.get('/api/admin/users', async (req, res) => res.json(await User.find({}, 'username discriminator pfp isAdmin isVerified')));
 app.get('/api/admin/servers', async (req, res) => res.json(await Server.find({}, 'name isVerified')));
+
+// Verification Routes
 app.put('/api/admin/servers/verify/:id', async (req, res) => res.json(await Server.findByIdAndUpdate(req.params.id, { isVerified: req.body.isVerified }, {new: true})));
+app.put('/api/admin/users/verify/:id', async (req, res) => res.json(await User.findByIdAndUpdate(req.params.id, { isVerified: req.body.isVerified }, {new: true})));
+
 app.delete('/api/admin/users/:id', async (req, res) => { await User.findByIdAndDelete(req.params.id); res.json({success:true}); });
 
 app.listen(3000, () => console.log(`Server running on port 3000`));
