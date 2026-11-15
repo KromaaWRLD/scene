@@ -6,6 +6,7 @@ let messageInterval = null;
 let replyingToId = null;
 
 window.userCache = {}; 
+window.currentServerMembers = []; // Needed for mention autocomplete
 
 function toBase64(file) {
     return new Promise((resolve, reject) => {
@@ -37,9 +38,14 @@ async function acceptInvite() {
     hideModal('invite-prompt-modal');
     loadServers();
 }
-function cancelInvite() {
-    localStorage.removeItem('pending_invite');
-    hideModal('invite-prompt-modal');
+function cancelInvite() { localStorage.removeItem('pending_invite'); hideModal('invite-prompt-modal'); }
+
+async function joinServerViaCode() {
+    const code = document.getElementById('join-invite-code').value;
+    if(!code) return;
+    await fetch(`${API_URL}/servers/join/${code}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser._id }) });
+    hideModal('server-modal');
+    loadServers();
 }
 
 // --- AUTH ---
@@ -73,11 +79,8 @@ function updateUserPanel() {
     document.getElementById('my-username').innerText = currentUser.username;
     document.getElementById('my-custom-status').innerText = currentUser.customStatus || 'Online';
     document.getElementById('my-pfp').src = currentUser.pfp;
-    
     const dot = document.getElementById('my-activity-dot');
     dot.className = `status-dot ${currentUser.activity || 'online'}`;
-    
-    // Unlock Admin Tab if Admin (This un-hides the tab for verified Admins)
     if(currentUser.isAdmin) document.getElementById('tab-admin').style.display = 'block';
 }
 
@@ -86,7 +89,6 @@ function showSettingsPane(id) {
     document.querySelectorAll('.settings-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(id).classList.remove('hidden');
     event.target.classList.add('active');
-    
     if(id === 'settings-admin-panel') loadAdminPanel();
 }
 
@@ -95,13 +97,11 @@ function openUserSettings() {
     document.getElementById('settings-header').innerText = "USER SETTINGS";
     document.getElementById('tab-server').style.display = 'none';
     showSettingsPane('settings-user-panel');
-    
     document.getElementById('set-preview-name').innerText = `${currentUser.username}#${currentUser.discriminator}`;
     document.getElementById('set-preview-pfp').src = currentUser.pfp;
     document.getElementById('set-bio').value = currentUser.bio;
     document.getElementById('set-activity').value = currentUser.activity || 'online';
     document.getElementById('set-custom-status').value = currentUser.customStatus || '';
-    
     const bannerEl = document.getElementById('set-preview-banner');
     if(currentUser.banner.startsWith('data:') || currentUser.banner.startsWith('http')) {
         bannerEl.style.backgroundImage = `url(${currentUser.banner})`; bannerEl.style.backgroundColor = 'transparent';
@@ -115,17 +115,9 @@ async function saveProfile() {
     const bannerFile = document.getElementById('upload-banner').files[0];
     let pfpData = currentUser.pfp;
     let bannerData = currentUser.banner;
-    
     if (pfpFile) pfpData = await toBase64(pfpFile);
     if (bannerFile) bannerData = await toBase64(bannerFile);
-
-    const updates = {
-        pfp: pfpData, banner: bannerData,
-        bio: document.getElementById('set-bio').value,
-        activity: document.getElementById('set-activity').value,
-        customStatus: document.getElementById('set-custom-status').value
-    };
-    
+    const updates = { pfp: pfpData, banner: bannerData, bio: document.getElementById('set-bio').value, activity: document.getElementById('set-activity').value, customStatus: document.getElementById('set-custom-status').value };
     const res = await fetch(`${API_URL}/users/${currentUser._id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(updates) });
     currentUser = await res.json();
     localStorage.setItem('scene_user', JSON.stringify(currentUser));
@@ -138,23 +130,12 @@ function openServerSettings() {
     document.getElementById('settings-header').innerText = `${activeServer.name.toUpperCase()} SETTINGS`;
     document.getElementById('tab-server').style.display = 'block';
     showSettingsPane('settings-server-panel');
-    
     document.getElementById('edit-server-name').value = activeServer.name;
     document.getElementById('server-invite-link').value = `${window.location.origin}/?invite=${activeServer.inviteCode}`;
 }
-async function saveServer() {
-    await fetch(`${API_URL}/servers/${activeServer._id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: document.getElementById('edit-server-name').value }) });
-    closeSettings(); loadServers();
-}
-async function deleteServer() {
-    if(!confirm("Are you sure? This cannot be undone.")) return;
-    await fetch(`${API_URL}/servers/${activeServer._id}`, { method: 'DELETE' });
-    closeSettings(); goHome(); loadServers();
-}
-function copyInvite() {
-    const input = document.getElementById('server-invite-link');
-    input.select(); document.execCommand('copy'); alert('Invite copied!');
-}
+async function saveServer() { await fetch(`${API_URL}/servers/${activeServer._id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: document.getElementById('edit-server-name').value }) }); closeSettings(); loadServers(); }
+async function deleteServer() { if(!confirm("Are you sure? This cannot be undone.")) return; await fetch(`${API_URL}/servers/${activeServer._id}`, { method: 'DELETE' }); closeSettings(); goHome(); loadServers(); }
+function copyInvite() { const input = document.getElementById('server-invite-link'); input.select(); document.execCommand('copy'); alert('Invite copied!'); }
 function closeSettings() { document.getElementById('settings-screen').classList.add('hidden'); }
 
 // --- ADMIN LOGIC ---
@@ -163,23 +144,13 @@ async function loadAdminPanel() {
     const users = await uRes.json();
     const uContainer = document.getElementById('admin-user-list'); uContainer.innerHTML = '';
     users.forEach(u => {
-        uContainer.innerHTML += `<div class="admin-item">
-            <div style="display:flex;align-items:center;gap:10px;"><img src="${u.pfp}" style="width:24px;height:24px;border-radius:50%;">${u.username}#${u.discriminator} ${u.isAdmin?'(Admin)':''}</div>
-            <button class="btn-del" onclick="adminDeleteUser('${u._id}')">Delete</button>
-        </div>`;
+        uContainer.innerHTML += `<div class="admin-item"><div style="display:flex;align-items:center;gap:10px;"><img src="${u.pfp}" style="width:24px;height:24px;border-radius:50%;">${u.username}#${u.discriminator} ${u.isAdmin?'(Admin)':''}</div><button class="btn-del" onclick="adminDeleteUser('${u._id}')">Delete</button></div>`;
     });
-    
     const sRes = await fetch(`${API_URL}/admin/servers`);
     const servers = await sRes.json();
     const sContainer = document.getElementById('admin-server-list'); sContainer.innerHTML = '';
     servers.forEach(s => {
-        sContainer.innerHTML += `<div class="admin-item">
-            <div>${s.name} ${s.isVerified?'(Verified)':''}</div>
-            <div style="display:flex;gap:5px;">
-                <button class="btn-verify" onclick="adminToggleVerify('${s._id}', ${!s.isVerified})">${s.isVerified?'Unverify':'Verify'}</button>
-                <button class="btn-del" onclick="adminDeleteServer('${s._id}')">Delete</button>
-            </div>
-        </div>`;
+        sContainer.innerHTML += `<div class="admin-item"><div>${s.name} ${s.isVerified?'(Verified)':''}</div><div style="display:flex;gap:5px;"><button class="btn-verify" onclick="adminToggleVerify('${s._id}', ${!s.isVerified})">${s.isVerified?'Unverify':'Verify'}</button><button class="btn-del" onclick="adminDeleteServer('${s._id}')">Delete</button></div></div>`;
     });
 }
 async function adminDeleteUser(id) { await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE' }); loadAdminPanel(); }
@@ -187,11 +158,10 @@ async function adminDeleteServer(id) { await fetch(`${API_URL}/servers/${id}`, {
 async function adminToggleVerify(id, status) { await fetch(`${API_URL}/admin/servers/verify/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ isVerified: status }) }); loadAdminPanel(); loadServers(); }
 
 
-// --- PROFILES (CHANGED TO LITTLE POPOUT) ---
+// --- PROFILES ---
 window.showUserProfile = function(event, userId) {
     const user = window.userCache[userId];
     if(!user) return;
-    
     document.getElementById('view-username').innerText = user.username;
     document.getElementById('view-disc').innerText = `#${user.discriminator}`;
     document.getElementById('view-pfp').src = user.pfp;
@@ -203,9 +173,7 @@ window.showUserProfile = function(event, userId) {
     
     const badgeContainer = document.getElementById('view-badges');
     badgeContainer.innerHTML = '';
-    if(user.badges) {
-        user.badges.forEach(b => { badgeContainer.innerHTML += `<span class="badge">${b}</span>`; });
-    }
+    if(user.badges) user.badges.forEach(b => { badgeContainer.innerHTML += `<span class="badge">${b}</span>`; });
 
     const bannerEl = document.getElementById('view-banner');
     if(user.banner.startsWith('data:') || user.banner.startsWith('http')) {
@@ -214,20 +182,32 @@ window.showUserProfile = function(event, userId) {
         bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = user.banner;
     }
     
-    // Position it like Discord right next to the cursor click
     const modal = document.getElementById('view-profile-modal');
     modal.classList.remove('hidden');
-    
     let x = event.clientX + 10;
     let y = event.clientY + 10;
-    
-    // Prevent it from clipping off the screen
     if (x + 300 > window.innerWidth) x = window.innerWidth - 320;
     if (y + 400 > window.innerHeight) y = window.innerHeight - 420;
-    
     modal.style.left = x + 'px';
     modal.style.top = y + 'px';
 }
+
+// Global click closer for menus/popups
+document.addEventListener('click', (e) => {
+    if(!e.target.closest('#view-profile-modal') && !e.target.classList.contains('avatar') && !e.target.classList.contains('username')) {
+        document.getElementById('view-profile-modal').classList.add('hidden');
+    }
+    if(!e.target.closest('#context-menu')) {
+        document.getElementById('context-menu').classList.add('hidden');
+    }
+    if(!e.target.closest('emoji-picker') && e.target.id !== 'emoji-btn') {
+        document.getElementById('emoji-picker').classList.add('hidden');
+    }
+    if(!e.target.closest('#mention-suggestions')) {
+        document.getElementById('mention-suggestions').classList.add('hidden');
+    }
+});
+
 
 // --- NAVIGATION ---
 async function goHome() {
@@ -239,11 +219,14 @@ async function goHome() {
     document.getElementById('add-channel-btn').classList.add('hidden');
     document.getElementById('server-settings-btn').classList.add('hidden');
     document.getElementById('member-list').classList.add('hidden');
+    document.getElementById('messages-container').innerHTML = '';
     
     const res = await fetch(`${API_URL}/users/${currentUser._id}/friends`);
     const data = await res.json();
     const list = document.getElementById('sidebar-list'); list.innerHTML = '';
     
+    let firstFriendDiv = null;
+
     data.friends.forEach(f => {
         window.userCache[f._id] = f; 
         const dm = data.dms.find(d => d.participants.includes(f._id));
@@ -254,7 +237,18 @@ async function goHome() {
             e.currentTarget.classList.add('active'); selectChat(dm._id, `@${f.username}`);
         };
         list.appendChild(div);
+        
+        if(!firstFriendDiv) firstFriendDiv = div;
     });
+
+    // AUTO-LOAD FIRST DM
+    if(firstFriendDiv) {
+        firstFriendDiv.click();
+    } else {
+        document.getElementById('current-chat-name').innerText = "No Friends Yet";
+        document.getElementById('current-chat-topic').innerText = "";
+        currentTargetId = null;
+    }
 }
 
 async function loadServers() {
@@ -283,14 +277,32 @@ async function selectServer(server) {
     document.getElementById('add-channel-btn').classList.toggle('hidden', !isOwner && !isSysAdmin);
     document.getElementById('server-settings-btn').classList.toggle('hidden', !isOwner && !isSysAdmin);
     document.getElementById('member-list').classList.remove('hidden');
-    
-    // Clear old chat when switching
     document.getElementById('messages-container').innerHTML = ''; 
+    
     loadChannels(server._id);
     loadMembers(server._id);
 }
 
-// LOGIC ADDED: Auto-joins first accessible chat and renders locked icons
+// RIGHT CLICK CONTEXT MENU LOGIC
+let contextTargetId = null;
+function showContextMenu(e, id, type) {
+    e.preventDefault();
+    // Only owner/admin can delete channels
+    if (activeServer && (activeServer.ownerId === currentUser._id || currentUser.isAdmin)) {
+        const menu = document.getElementById('context-menu');
+        menu.style.left = `${e.pageX}px`;
+        menu.style.top = `${e.pageY}px`;
+        menu.classList.remove('hidden');
+        contextTargetId = id;
+    }
+}
+async function deleteChannelCtx() {
+    if(!contextTargetId) return;
+    await fetch(`${API_URL}/channels/${contextTargetId}`, { method: 'DELETE' });
+    document.getElementById('context-menu').classList.add('hidden');
+    loadChannels(activeServer._id);
+}
+
 async function loadChannels(serverId) {
     const res = await fetch(`${API_URL}/servers/${serverId}/channels`);
     const channels = await res.json();
@@ -299,32 +311,32 @@ async function loadChannels(serverId) {
     let firstAllowedChannel = null;
 
     channels.forEach((c) => {
-        // Permissions logic: Are they allowed?
         const isAllowed = !c.isLocked || c.allowedMembers?.includes(currentUser._id) || activeServer.ownerId === currentUser._id || currentUser.isAdmin;
         const lockIcon = c.isLocked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#72767d" stroke-width="2" style="margin-left:auto;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>` : '';
         
         const div = document.createElement('div'); div.className = 'list-item';
         div.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> ${c.name} ${lockIcon}`;
         
+        // Right Click Listener
+        div.addEventListener('contextmenu', (e) => showContextMenu(e, c._id, 'channel'));
+        
         div.onclick = (e) => {
             if(!isAllowed) return alert("You don't have permission to view this locked channel.");
             document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
-            e.currentTarget.classList.add('active'); selectChat(c._id, `# ${c.name}`);
+            e.currentTarget.classList.add('active'); 
+            selectChat(c._id, `# ${c.name}`, c.topic);
         };
         list.appendChild(div);
         
-        // Grab the first channel they actually have access to
-        if(isAllowed && !firstAllowedChannel) {
-            firstAllowedChannel = { c, div };
-        }
+        if(isAllowed && !firstAllowedChannel) firstAllowedChannel = { c, div };
     });
 
-    // Auto-Select the first allowed channel
     if (firstAllowedChannel) {
         firstAllowedChannel.div.classList.add('active');
-        selectChat(firstAllowedChannel.c._id, `# ${firstAllowedChannel.c.name}`);
+        selectChat(firstAllowedChannel.c._id, `# ${firstAllowedChannel.c.name}`, firstAllowedChannel.c.topic);
     } else {
         document.getElementById('current-chat-name').innerText = "No Channels Available";
+        document.getElementById('current-chat-topic').innerText = "";
         currentTargetId = null;
     }
 }
@@ -332,20 +344,23 @@ async function loadChannels(serverId) {
 async function loadMembers(serverId) {
     const res = await fetch(`${API_URL}/servers/${serverId}/members`);
     const members = await res.json();
+    window.currentServerMembers = members; // Cache globally for @mentions
     const container = document.getElementById('members-container'); container.innerHTML = '';
     members.forEach(m => {
         window.userCache[m._id] = m; 
         const div = document.createElement('div'); div.className = 'member-item';
         div.innerHTML = `<div class="avatar-wrapper"><img src="${m.pfp}" class="avatar" style="width:28px;height:28px;"><div class="status-dot ${m.activity}" style="width:10px;height:10px;"></div></div> <span class="username">${m.username}</span>`;
-        div.onclick = (e) => showUserProfile(e, m._id); // Pass Event for popout positioning
+        div.onclick = (e) => showUserProfile(e, m._id); 
         container.appendChild(div);
     });
 }
 
+
 // --- MESSAGES ---
-function selectChat(targetId, chatName) {
+function selectChat(targetId, chatName, topic = "") {
     currentTargetId = targetId;
     document.getElementById('current-chat-name').innerText = chatName;
+    document.getElementById('current-chat-topic').innerText = topic;
     document.getElementById('message-input').disabled = false;
     cancelReply();
     loadMessages(true);
@@ -370,7 +385,6 @@ async function editMsg(id) {
     }
 }
 
-// LOGIC ADDED: Message Timestamps (Dates), XSS Protection, and @Mentions
 async function loadMessages(forceScroll = false) {
     if (!currentTargetId) return;
     const res = await fetch(`${API_URL}/messages/${currentTargetId}`);
@@ -381,11 +395,8 @@ async function loadMessages(forceScroll = false) {
     container.innerHTML = '';
     messages.forEach(msg => {
         window.userCache[msg.authorId._id] = msg.authorId;
-        
-        // Full Dates instead of just time
         const time = new Date(msg.timestamp).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute:'2-digit' });
         
-        // Highlight Mentions and block XSS
         let safeContent = msg.content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
         safeContent = safeContent.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
 
@@ -393,22 +404,17 @@ async function loadMessages(forceScroll = false) {
         
         let replyHtml = '';
         if (msg.replyTo && msg.replyTo.authorId) {
-            replyHtml = `<div class="reply-context">
-                <img src="${msg.replyTo.authorId.pfp || ''}" style="width:16px;height:16px;border-radius:50%;">
-                <span class="rep-user">@${msg.replyTo.authorId.username}</span> ${msg.replyTo.content.substring(0, 40)}...
-            </div>`;
+            replyHtml = `<div class="reply-context"><img src="${msg.replyTo.authorId.pfp || ''}" style="width:16px;height:16px;border-radius:50%;"><span class="rep-user">@${msg.replyTo.authorId.username}</span> ${msg.replyTo.content.substring(0, 40)}...</div>`;
         }
 
-        let actionHtml = `<div class="message-actions">
-            <button onclick="initReply('${msg._id}', '${msg.authorId.username}')" title="Reply"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></button>`;
+        let actionHtml = `<div class="message-actions"><button onclick="initReply('${msg._id}', '${msg.authorId.username}')" title="Reply"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></button>`;
         
-        if(msg.authorId._id.toString() === currentUser._id.toString()) {
+        if(msg.authorId._id.toString() === currentUser._id.toString() || currentUser.isAdmin) {
             actionHtml += `<button onclick="editMsg('${msg._id}')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
                            <button class="del" onclick="deleteMsg('${msg._id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
         }
         actionHtml += `</div>`;
 
-        // Notice onclick="showUserProfile(event, ...)" is now passing the event for mouse coordinates
         div.innerHTML = `
             ${replyHtml}
             <div class="message">
@@ -425,8 +431,45 @@ async function loadMessages(forceScroll = false) {
         `;
         container.appendChild(div);
     });
-    
     if(isAtBottom || forceScroll) container.scrollTop = container.scrollHeight;
+}
+
+// EMOJI PICKER LOGIC
+document.getElementById('emoji-btn').addEventListener('click', () => {
+    document.getElementById('emoji-picker').classList.toggle('hidden');
+});
+document.querySelector('emoji-picker').addEventListener('emoji-click', event => {
+    const input = document.getElementById('message-input');
+    input.value += event.detail.unicode;
+    document.getElementById('emoji-picker').classList.add('hidden');
+    input.focus();
+});
+
+// @ MENTION AUTOCOMPLETE LOGIC
+document.getElementById('message-input').addEventListener('input', (e) => {
+    const val = e.target.value;
+    const match = val.match(/@(\w*)$/);
+    const popup = document.getElementById('mention-suggestions');
+    
+    if (match && activeServer) {
+        const query = match[1].toLowerCase();
+        const filtered = window.currentServerMembers.filter(m => m.username.toLowerCase().startsWith(query));
+        
+        if (filtered.length > 0) {
+            popup.innerHTML = filtered.map(m => `<div class="mention-item" onclick="insertMention('${m.username}')"><img src="${m.pfp}">${m.username}</div>`).join('');
+            popup.classList.remove('hidden');
+        } else {
+            popup.classList.add('hidden');
+        }
+    } else {
+        popup.classList.add('hidden');
+    }
+});
+window.insertMention = function(username) {
+    const input = document.getElementById('message-input');
+    input.value = input.value.replace(/@\w*$/, `@${username} `);
+    document.getElementById('mention-suggestions').classList.add('hidden');
+    input.focus();
 }
 
 document.getElementById('message-form').addEventListener('submit', async (e) => {
@@ -438,13 +481,12 @@ document.getElementById('message-form').addEventListener('submit', async (e) => 
     cancelReply(); loadMessages(true);
 });
 
-// Utility
+// Utility Modals
 function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function hideModal(id) { document.getElementById(id).classList.add('hidden'); }
 async function addFriend() { await fetch(`${API_URL}/friends/add`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ currentUserId: currentUser._id, friendTag: document.getElementById('friend-tag').value }) }); hideModal('friend-modal'); goHome(); }
 async function createServer() { await fetch(`${API_URL}/servers`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: document.getElementById('new-server-name').value, userId: currentUser._id }) }); hideModal('server-modal'); loadServers(); }
 
-// LOGIC ADDED: Support checkbox for Locked Channels
 async function createChannel() { 
     const isLocked = document.getElementById('new-channel-locked').checked;
     await fetch(`${API_URL}/servers/${activeServer._id}/channels`, { 
@@ -452,6 +494,7 @@ async function createChannel() {
         headers: {'Content-Type': 'application/json'}, 
         body: JSON.stringify({ 
             name: document.getElementById('new-channel-name').value,
+            topic: document.getElementById('new-channel-topic').value,
             isLocked: isLocked,
             userId: currentUser._id
         }) 
