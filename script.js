@@ -4,10 +4,10 @@ let currentTargetId = null;
 let activeServer = null;
 let messageInterval = null;
 let replyingToId = null;
+let lastRenderedHash = "";
 
 window.userCache = {}; 
 window.currentServerMembers = [];
-window.currentProfileUserTag = null; // Store tag to send friend request
 
 const verifiedSVG = `<svg class="verified-badge verified-svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor"/><path d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -87,18 +87,32 @@ function updateUserPanel() {
     
     if(currentUser.isAdmin) {
         document.getElementById('tab-admin').style.display = 'block';
+        document.getElementById('quick-admin-btn').classList.remove('hidden');
     }
 }
 
-function showSettingsPane(id) {
+function showSettingsPane(id, tabEl = null) {
     document.querySelectorAll('.settings-pane').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.settings-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(id).classList.remove('hidden');
     
-    if (event && event.target && event.target.classList) {
+    if (tabEl) {
+        tabEl.classList.add('active');
+    } else if (typeof event !== 'undefined' && event && event.target && event.target.classList) {
         event.target.classList.add('active');
     }
     if(id === 'settings-admin-panel') loadAdminPanel();
+}
+
+function openAdminSettingsQuickly() {
+    document.getElementById('settings-screen').classList.remove('hidden');
+    document.getElementById('settings-header').innerText = "USER SETTINGS";
+    
+    document.getElementById('tab-my-account').style.display = 'block';
+    document.getElementById('tab-admin').style.display = 'block';
+    document.getElementById('tab-server').style.display = 'none';
+    
+    showSettingsPane('settings-admin-panel', document.getElementById('tab-admin'));
 }
 
 function openUserSettings() {
@@ -109,8 +123,7 @@ function openUserSettings() {
     if(currentUser.isAdmin) document.getElementById('tab-admin').style.display = 'block';
     document.getElementById('tab-server').style.display = 'none'; 
     
-    showSettingsPane('settings-user-panel');
-    document.getElementById('tab-my-account').classList.add('active');
+    showSettingsPane('settings-user-panel', document.getElementById('tab-my-account'));
     
     document.getElementById('set-preview-name').innerText = `${currentUser.username}#${currentUser.discriminator}`;
     document.getElementById('set-preview-pfp').src = currentUser.pfp;
@@ -133,8 +146,7 @@ function openServerSettings() {
     document.getElementById('tab-admin').style.display = 'none';
     document.getElementById('tab-server').style.display = 'block'; 
     
-    showSettingsPane('settings-server-panel');
-    document.getElementById('tab-server').classList.add('active');
+    showSettingsPane('settings-server-panel', document.getElementById('tab-server'));
     
     document.getElementById('edit-server-name').value = activeServer.name;
     document.getElementById('server-invite-link').value = `${window.location.origin}/?invite=${activeServer.inviteCode}`;
@@ -193,14 +205,11 @@ async function adminDeleteServer(id) { await fetch(`${API_URL}/servers/${id}`, {
 async function adminToggleVerify(id, status) { await fetch(`${API_URL}/admin/servers/verify/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ isVerified: status }) }); loadAdminPanel(); loadServers(); }
 async function adminToggleVerifyUser(id, status) { await fetch(`${API_URL}/admin/users/verify/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ isVerified: status }) }); loadAdminPanel(); }
 
-
-// --- PROFILES & FRIEND REQUESTS ---
+// --- PROFILES ---
 window.showUserProfile = function(event, userId) {
     event.stopPropagation();
     const user = window.userCache[userId];
     if(!user) return;
-    
-    window.currentProfileUserTag = `${user.username}#${user.discriminator}`;
     
     document.getElementById('view-username').innerHTML = `${user.username}<span id="view-disc">#${user.discriminator}</span> ${user.isVerified ? verifiedSVG : ''}`;
     document.getElementById('view-pfp').src = user.pfp;
@@ -222,16 +231,6 @@ window.showUserProfile = function(event, userId) {
     } else {
         bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = user.banner || '#36393f';
     }
-
-    // Toggle Friend Request Button
-    const addBtn = document.getElementById('view-add-friend-btn');
-    if (user._id === currentUser._id) {
-        addBtn.classList.add('hidden'); // Hide if self
-    } else {
-        addBtn.classList.remove('hidden');
-        addBtn.innerText = "Send Friend Request";
-        addBtn.style.background = "#43b581";
-    }
     
     const modal = document.getElementById('view-profile-modal');
     modal.classList.remove('hidden');
@@ -243,22 +242,6 @@ window.showUserProfile = function(event, userId) {
     
     modal.style.left = x + 'px';
     modal.style.top = y + 'px';
-}
-
-window.sendFriendRequestFromProfile = async function() {
-    if(!window.currentProfileUserTag) return;
-    const btn = document.getElementById('view-add-friend-btn');
-    btn.innerText = "Sent!";
-    btn.style.background = "#3ba55c"; // Success green
-    
-    await fetch(`${API_URL}/friends/add`, { 
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'}, 
-        body: JSON.stringify({ currentUserId: currentUser._id, friendTag: window.currentProfileUserTag }) 
-    });
-    
-    // Refresh sidebar if we are in Home
-    if (!activeServer) goHome();
 }
 
 // Global Click Closer
@@ -277,7 +260,6 @@ document.addEventListener('click', (e) => {
         document.getElementById('mention-suggestions').classList.add('hidden');
     }
 });
-
 
 // --- NAVIGATION ---
 async function goHome() {
@@ -317,6 +299,7 @@ async function goHome() {
     } else {
         document.getElementById('current-chat-name').innerText = "No Friends Yet";
         currentTargetId = null;
+        lastRenderedHash = "";
         document.getElementById('messages-container').innerHTML = '';
     }
 }
@@ -404,6 +387,7 @@ async function loadChannels(serverId) {
         document.getElementById('current-chat-name').innerText = "No Channels Available";
         document.getElementById('current-chat-topic').innerText = "";
         currentTargetId = null;
+        lastRenderedHash = "";
         document.getElementById('messages-container').innerHTML = '';
     }
 }
@@ -424,19 +408,19 @@ async function loadMembers(serverId) {
 
 // --- MESSAGES ---
 function selectChat(targetId, chatName, topic = "") {
-    if (currentTargetId === targetId) return; // SMOOTH SWAP: Don't reload if already here
+    if (currentTargetId === targetId) return;
     
     currentTargetId = targetId;
+    lastRenderedHash = "";
     document.getElementById('current-chat-name').innerText = chatName;
     document.getElementById('current-chat-topic').innerText = topic;
     document.getElementById('message-input').disabled = false;
     cancelReply();
     
-    // SMOOTH SWAP: Show loading placeholder instantly instead of flashing empty
     document.getElementById('messages-container').innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#72767d;">Loading messages...</div>`;
     
     if (messageInterval) clearInterval(messageInterval);
-    loadMessages(true); // network fetch
+    loadMessages(true);
     messageInterval = setInterval(() => loadMessages(false), 2000);
 }
 
@@ -459,51 +443,70 @@ async function editMsg(id) {
 
 async function loadMessages(forceScroll = false) {
     if (!currentTargetId) return;
-    const res = await fetch(`${API_URL}/messages/${currentTargetId}`);
-    const messages = await res.json();
-    const container = document.getElementById('messages-container');
-    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+    const requestedTargetId = currentTargetId;
     
-    container.innerHTML = ''; // Clear loading screen on successful fetch
-    messages.forEach(msg => {
-        window.userCache[msg.authorId._id] = msg.authorId;
-        const time = new Date(msg.timestamp).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute:'2-digit' });
+    try {
+        const res = await fetch(`${API_URL}/messages/${requestedTargetId}`);
+        if (!res.ok) throw new Error("Failed to fetch messages");
+        const messages = await res.json();
         
-        let safeContent = msg.content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        safeContent = safeContent.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+        // Abort if user switched channels while request was in flight
+        if (currentTargetId !== requestedTargetId) return;
 
-        const div = document.createElement('div'); div.className = 'message-wrapper';
+        // Prevent pulsating re-renders if nothing in the chat changed
+        const currentHash = `${requestedTargetId}:` + messages.map(m => `${m._id}-${m.content}-${m.isEdited}`).join('|');
+        if (!forceScroll && currentHash === lastRenderedHash) return;
+        lastRenderedHash = currentHash;
+
+        const container = document.getElementById('messages-container');
+        const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
         
-        let replyHtml = '';
-        if (msg.replyTo && msg.replyTo.authorId) {
-            replyHtml = `<div class="reply-context"><img src="${msg.replyTo.authorId.pfp || ''}" style="width:16px;height:16px;border-radius:50%;"><span class="rep-user">@${msg.replyTo.authorId.username}</span> ${msg.replyTo.content.substring(0, 40)}...</div>`;
-        }
+        container.innerHTML = '';
+        messages.forEach(msg => {
+            window.userCache[msg.authorId._id] = msg.authorId;
+            const time = new Date(msg.timestamp).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute:'2-digit' });
+            
+            let safeContent = msg.content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            safeContent = safeContent.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
 
-        let actionHtml = `<div class="message-actions"><button onclick="initReply('${msg._id}', '${msg.authorId.username}')" title="Reply"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></button>`;
-        
-        if(msg.authorId._id.toString() === currentUser._id.toString() || currentUser.isAdmin) {
-            actionHtml += `<button onclick="editMsg('${msg._id}')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
-                           <button class="del" onclick="deleteMsg('${msg._id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
-        }
-        actionHtml += `</div>`;
+            const div = document.createElement('div'); div.className = 'message-wrapper';
+            
+            let replyHtml = '';
+            if (msg.replyTo && msg.replyTo.authorId) {
+                replyHtml = `<div class="reply-context"><img src="${msg.replyTo.authorId.pfp || ''}" style="width:16px;height:16px;border-radius:50%;"><span class="rep-user">@${msg.replyTo.authorId.username}</span> ${msg.replyTo.content.substring(0, 40)}...</div>`;
+            }
 
-        div.innerHTML = `
-            ${replyHtml}
-            <div class="message">
-                <img src="${msg.authorId.pfp}" class="avatar" onclick="showUserProfile(event, '${msg.authorId._id}')">
-                <div style="flex:1;">
-                    <div class="message-header">
-                        <span class="username" onclick="showUserProfile(event, '${msg.authorId._id}')">${msg.authorId.username} ${msg.authorId.isVerified?verifiedSVG:''}</span>
-                        <span class="timestamp">${time}</span>
+            let actionHtml = `<div class="message-actions"><button onclick="initReply('${msg._id}', '${msg.authorId.username}')" title="Reply"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></button>`;
+            
+            if(msg.authorId._id.toString() === currentUser._id.toString() || currentUser.isAdmin) {
+                actionHtml += `<button onclick="editMsg('${msg._id}')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
+                               <button class="del" onclick="deleteMsg('${msg._id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
+            }
+            actionHtml += `</div>`;
+
+            div.innerHTML = `
+                ${replyHtml}
+                <div class="message">
+                    <img src="${msg.authorId.pfp}" class="avatar" onclick="showUserProfile(event, '${msg.authorId._id}')">
+                    <div style="flex:1;">
+                        <div class="message-header">
+                            <span class="username" onclick="showUserProfile(event, '${msg.authorId._id}')">${msg.authorId.username} ${msg.authorId.isVerified?verifiedSVG:''}</span>
+                            <span class="timestamp">${time}</span>
+                        </div>
+                        <div class="text">${safeContent} ${msg.isEdited ? '<span class="is-edited">(edited)</span>' : ''}</div>
                     </div>
-                    <div class="text">${safeContent} ${msg.isEdited ? '<span class="is-edited">(edited)</span>' : ''}</div>
+                    ${actionHtml}
                 </div>
-                ${actionHtml}
-            </div>
-        `;
-        container.appendChild(div);
-    });
-    if(isAtBottom || forceScroll) container.scrollTop = container.scrollHeight;
+            `;
+            container.appendChild(div);
+        });
+        if(isAtBottom || forceScroll) container.scrollTop = container.scrollHeight;
+    } catch (err) {
+        console.error("Failed to load messages:", err);
+        if (forceScroll && currentTargetId === requestedTargetId) {
+            document.getElementById('messages-container').innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#ed4245;">Failed to load messages.</div>`;
+        }
+    }
 }
 
 // EMOJI & MENTION LOGIC
