@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>Scene</title>
     <link rel="stylesheet" href="style.css">
+    <!-- EMOJI PICKER MODULE -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
 </head>
 <body>
     <div id="auth-screen" class="screen">
@@ -73,25 +75,30 @@
         <main class="chat-area">
             <header class="chat-header">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#72767d" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                <h3 id="current-chat-name" style="margin-left:8px;">Select a Chat</h3>
+                <div>
+                    <h3 id="current-chat-name">Select a Chat</h3>
+                    <div id="current-chat-topic" style="font-size:12px; color:#b9bbbe; margin-top:2px;"></div>
+                </div>
             </header>
             <div class="messages-container" id="messages-container"></div>
-            <div class="input-area">
+            <div class="input-area" style="position:relative;">
+                <div id="mention-suggestions" class="hidden"></div>
+                <emoji-picker id="emoji-picker" class="hidden"></emoji-picker>
                 <div id="reply-banner" class="hidden">
                     <span>Replying to <b id="reply-user">User</b></span>
                     <button class="close-reply" onclick="cancelReply()">✕</button>
                 </div>
-                <form id="message-form">
-                    <input type="text" id="message-input" placeholder="Send a message..." disabled autocomplete="off">
+                <form id="message-form" style="display:flex; background:#40444b; border-radius:8px;">
+                    <button type="button" id="emoji-btn" class="icon-btn" style="padding:12px;">😀</button>
+                    <input type="text" id="message-input" placeholder="Send a message..." disabled autocomplete="off" style="border-radius:0 8px 8px 0; background:transparent;">
                 </form>
             </div>
         </main>
+    </div>
 
-        <!-- Members List -->
-        <aside class="member-list hidden" id="member-list">
-            <h3 class="member-role">Members</h3>
-            <div id="members-container"></div>
-        </aside>
+    <!-- RIGHT CLICK CONTEXT MENU -->
+    <div id="context-menu" class="hidden">
+        <div id="cm-delete-channel" class="context-item danger" onclick="deleteChannelCtx()">Delete Channel</div>
     </div>
 
     <!-- FULL SCREEN SETTINGS -->
@@ -107,7 +114,6 @@
         <div class="settings-content">
             <button class="close-settings" onclick="closeSettings()">✕</button>
             
-            <!-- User Settings -->
             <div id="settings-user-panel" class="settings-pane">
                 <h2>My Account</h2>
                 <div class="profile-card">
@@ -133,7 +139,6 @@
                 <button class="save-btn" onclick="saveProfile()">Save Changes</button>
             </div>
 
-            <!-- Server Settings -->
             <div id="settings-server-panel" class="settings-pane hidden">
                 <h2>Server Overview</h2>
                 <label>Server Name</label>
@@ -148,7 +153,6 @@
                 <button class="save-btn danger" onclick="deleteServer()">Delete Server</button>
             </div>
 
-            <!-- Admin Panel -->
             <div id="settings-admin-panel" class="settings-pane hidden">
                 <h2 style="color:#faa61a;">System Admin Dashboard</h2>
                 <label>All Servers</label>
@@ -159,7 +163,7 @@
         </div>
     </div>
 
-    <!-- POPOUT View Profile Modal (Modified to not block screen) -->
+    <!-- POPOUT View Profile Modal -->
     <div id="view-profile-modal" class="profile-popout hidden">
         <div class="profile-card" style="margin: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
             <div class="profile-banner" id="view-banner"></div>
@@ -180,6 +184,7 @@
         </div>
     </div>
 
+    <!-- MODALS -->
     <div id="invite-prompt-modal" class="modal hidden">
         <div class="modal-content" style="text-align: center;">
             <h3>You've been invited!</h3>
@@ -189,16 +194,28 @@
         </div>
     </div>
 
-    <!-- Small Modals -->
-    <div id="server-modal" class="modal hidden"><div class="modal-content"><h3>Create Server</h3><input type="text" id="new-server-name" placeholder="Name"><button onclick="createServer()">Create</button><button onclick="hideModal('server-modal')">Cancel</button></div></div>
+    <div id="server-modal" class="modal hidden"><div class="modal-content">
+        <h3>Create or Join Server</h3>
+        <input type="text" id="new-server-name" placeholder="New Server Name">
+        <button onclick="createServer()">Create Server</button>
+        <div class="divider" style="margin:8px 0; background:#4f545c;"></div>
+        <input type="text" id="join-invite-code" placeholder="Invite Code (e.g. x8j9p)">
+        <button style="background:#43b581;" onclick="joinServerViaCode()">Join Server</button>
+        <button class="danger" style="margin-top:8px;" onclick="hideModal('server-modal')">Cancel</button>
+    </div></div>
     
-    <!-- ADDED LOCKED CHANNEL CHECKBOX -->
-    <div id="channel-modal" class="modal hidden"><div class="modal-content"><h3>Create Channel</h3><input type="text" id="new-channel-name" placeholder="Name">
+    <div id="channel-modal" class="modal hidden"><div class="modal-content">
+        <h3>Create Channel</h3>
+        <input type="text" id="new-channel-name" placeholder="Channel Name">
+        <input type="text" id="new-channel-topic" placeholder="Channel Topic/Description" style="margin-top:8px;">
         <label style="color:#b9bbbe; font-size:14px; display:flex; align-items:center; gap:8px; margin-top:8px;">
             <input type="checkbox" id="new-channel-locked"> Locked Channel (Admins & You)
         </label>
-        <button onclick="createChannel()">Create</button><button onclick="hideModal('channel-modal')">Cancel</button></div></div>
-    <div id="friend-modal" class="modal hidden"><div class="modal-content"><h3>Add Friend</h3><input type="text" id="friend-tag" placeholder="User#0000"><button onclick="addFriend()">Send</button><button onclick="hideModal('friend-modal')">Cancel</button></div></div>
+        <button onclick="createChannel()" style="margin-top:12px;">Create</button>
+        <button class="danger" onclick="hideModal('channel-modal')">Cancel</button>
+    </div></div>
+    
+    <div id="friend-modal" class="modal hidden"><div class="modal-content"><h3>Add Friend</h3><input type="text" id="friend-tag" placeholder="User#0000"><button onclick="addFriend()">Send</button><button class="danger" onclick="hideModal('friend-modal')">Cancel</button></div></div>
 
     <script src="script.js"></script>
 </body>
