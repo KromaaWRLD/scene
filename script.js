@@ -8,6 +8,8 @@ let replyingToId = null;
 window.userCache = {}; 
 window.currentServerMembers = [];
 
+const verifiedSVG = `<svg class="verified-badge verified-svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor"/><path d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 function toBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -33,7 +35,7 @@ function checkInvite() {
 }
 async function acceptInvite() {
     const inv = localStorage.getItem('pending_invite');
-    const res = await fetch(`${API_URL}/servers/join/${inv}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser._id }) });
+    await fetch(`${API_URL}/servers/join/${inv}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser._id }) });
     localStorage.removeItem('pending_invite');
     hideModal('invite-prompt-modal');
     loadServers();
@@ -82,8 +84,7 @@ function updateUserPanel() {
     const dot = document.getElementById('my-activity-dot');
     dot.className = `status-dot ${currentUser.activity || 'online'}`;
     
-    // FIX: Show Admin Panel Tab if user is Admin
-    if(currentUser.isAdmin === true) {
+    if(currentUser.isAdmin) {
         document.getElementById('tab-admin').style.display = 'block';
     }
 }
@@ -92,30 +93,52 @@ function showSettingsPane(id) {
     document.querySelectorAll('.settings-pane').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.settings-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(id).classList.remove('hidden');
-    event.target.classList.add('active');
     
+    // Add active class to whatever clicked tab triggered this
+    if (event && event.target && event.target.classList) {
+        event.target.classList.add('active');
+    }
     if(id === 'settings-admin-panel') loadAdminPanel();
 }
 
+// FIXED: Isolate "User Settings" from "Server Settings" UI logic
 function openUserSettings() {
     document.getElementById('settings-screen').classList.remove('hidden');
     document.getElementById('settings-header').innerText = "USER SETTINGS";
     
-    // Ensure Server tab is hidden when viewing User settings
-    document.getElementById('tab-server').style.display = 'none';
+    document.getElementById('tab-my-account').style.display = 'block';
+    if(currentUser.isAdmin) document.getElementById('tab-admin').style.display = 'block';
+    document.getElementById('tab-server').style.display = 'none'; // Hide Server tab
     
     showSettingsPane('settings-user-panel');
+    document.getElementById('tab-my-account').classList.add('active');
+    
     document.getElementById('set-preview-name').innerText = `${currentUser.username}#${currentUser.discriminator}`;
     document.getElementById('set-preview-pfp').src = currentUser.pfp;
-    document.getElementById('set-bio').value = currentUser.bio;
+    document.getElementById('set-bio').value = currentUser.bio || '';
     document.getElementById('set-activity').value = currentUser.activity || 'online';
     document.getElementById('set-custom-status').value = currentUser.customStatus || '';
     const bannerEl = document.getElementById('set-preview-banner');
-    if(currentUser.banner.startsWith('data:') || currentUser.banner.startsWith('http')) {
+    if(currentUser.banner && (currentUser.banner.startsWith('data:') || currentUser.banner.startsWith('http'))) {
         bannerEl.style.backgroundImage = `url(${currentUser.banner})`; bannerEl.style.backgroundColor = 'transparent';
     } else {
-        bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = currentUser.banner;
+        bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = currentUser.banner || '#36393f';
     }
+}
+
+function openServerSettings() {
+    document.getElementById('settings-screen').classList.remove('hidden');
+    document.getElementById('settings-header').innerText = `${activeServer.name.toUpperCase()} SETTINGS`;
+    
+    document.getElementById('tab-my-account').style.display = 'none';
+    document.getElementById('tab-admin').style.display = 'none';
+    document.getElementById('tab-server').style.display = 'block'; // Show Server tab
+    
+    showSettingsPane('settings-server-panel');
+    document.getElementById('tab-server').classList.add('active');
+    
+    document.getElementById('edit-server-name').value = activeServer.name;
+    document.getElementById('server-invite-link').value = `${window.location.origin}/?invite=${activeServer.inviteCode}`;
 }
 
 async function saveProfile() {
@@ -133,14 +156,6 @@ async function saveProfile() {
     closeSettings();
 }
 
-function openServerSettings() {
-    document.getElementById('settings-screen').classList.remove('hidden');
-    document.getElementById('settings-header').innerText = `${activeServer.name.toUpperCase()} SETTINGS`;
-    document.getElementById('tab-server').style.display = 'block';
-    showSettingsPane('settings-server-panel');
-    document.getElementById('edit-server-name').value = activeServer.name;
-    document.getElementById('server-invite-link').value = `${window.location.origin}/?invite=${activeServer.inviteCode}`;
-}
 async function saveServer() { await fetch(`${API_URL}/servers/${activeServer._id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: document.getElementById('edit-server-name').value }) }); closeSettings(); loadServers(); }
 async function deleteServer() { if(!confirm("Are you sure? This cannot be undone.")) return; await fetch(`${API_URL}/servers/${activeServer._id}`, { method: 'DELETE' }); closeSettings(); goHome(); loadServers(); }
 function copyInvite() { const input = document.getElementById('server-invite-link'); input.select(); document.execCommand('copy'); alert('Invite copied!'); }
@@ -152,18 +167,33 @@ async function loadAdminPanel() {
     const users = await uRes.json();
     const uContainer = document.getElementById('admin-user-list'); uContainer.innerHTML = '';
     users.forEach(u => {
-        uContainer.innerHTML += `<div class="admin-item"><div style="display:flex;align-items:center;gap:10px;"><img src="${u.pfp}" style="width:24px;height:24px;border-radius:50%;">${u.username}#${u.discriminator} ${u.isAdmin?'(Admin)':''}</div><button class="btn-del" onclick="adminDeleteUser('${u._id}')">Delete</button></div>`;
+        uContainer.innerHTML += `<div class="admin-item">
+            <div style="display:flex;align-items:center;gap:10px;"><img src="${u.pfp}" style="width:24px;height:24px;border-radius:50%;">${u.username}#${u.discriminator} ${u.isAdmin?'(Admin)':''} ${u.isVerified?verifiedSVG:''}</div>
+            <div style="display:flex;gap:5px;">
+                <button class="btn-verify" onclick="adminToggleVerifyUser('${u._id}', ${!u.isVerified})">${u.isVerified?'Unverify':'Verify'}</button>
+                <button class="btn-del" onclick="adminDeleteUser('${u._id}')">Delete</button>
+            </div>
+        </div>`;
     });
+
     const sRes = await fetch(`${API_URL}/admin/servers`);
     const servers = await sRes.json();
     const sContainer = document.getElementById('admin-server-list'); sContainer.innerHTML = '';
     servers.forEach(s => {
-        sContainer.innerHTML += `<div class="admin-item"><div>${s.name} ${s.isVerified?'(Verified)':''}</div><div style="display:flex;gap:5px;"><button class="btn-verify" onclick="adminToggleVerify('${s._id}', ${!s.isVerified})">${s.isVerified?'Unverify':'Verify'}</button><button class="btn-del" onclick="adminDeleteServer('${s._id}')">Delete</button></div></div>`;
+        sContainer.innerHTML += `<div class="admin-item">
+            <div style="display:flex;align-items:center;gap:4px;">${s.name} ${s.isVerified?verifiedSVG:''}</div>
+            <div style="display:flex;gap:5px;">
+                <button class="btn-verify" onclick="adminToggleVerify('${s._id}', ${!s.isVerified})">${s.isVerified?'Unverify':'Verify'}</button>
+                <button class="btn-del" onclick="adminDeleteServer('${s._id}')">Delete</button>
+            </div>
+        </div>`;
     });
 }
 async function adminDeleteUser(id) { await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE' }); loadAdminPanel(); }
 async function adminDeleteServer(id) { await fetch(`${API_URL}/servers/${id}`, { method: 'DELETE' }); loadAdminPanel(); loadServers(); }
 async function adminToggleVerify(id, status) { await fetch(`${API_URL}/admin/servers/verify/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ isVerified: status }) }); loadAdminPanel(); loadServers(); }
+async function adminToggleVerifyUser(id, status) { await fetch(`${API_URL}/admin/users/verify/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ isVerified: status }) }); loadAdminPanel(); }
+
 
 // --- PROFILES ---
 window.showUserProfile = function(event, userId) {
@@ -177,20 +207,26 @@ window.showUserProfile = function(event, userId) {
     document.getElementById('view-disc').innerText = `#${user.discriminator}`;
     document.getElementById('view-pfp').src = user.pfp;
     
+    // Add verification checkmark
+    document.getElementById('view-verified-badge').innerHTML = user.isVerified ? verifiedSVG : '';
+    
     let statusText = user.customStatus || user.activity.charAt(0).toUpperCase() + user.activity.slice(1);
     document.getElementById('view-status').innerText = statusText;
     document.getElementById('view-activity-dot').className = `status-dot large ${user.activity}`;
-    document.getElementById('view-bio').innerText = user.bio;
+    document.getElementById('view-bio').innerText = user.bio || '';
     
+    // Render Badges
     const badgeContainer = document.getElementById('view-badges');
     badgeContainer.innerHTML = '';
-    if(user.badges) user.badges.forEach(b => { badgeContainer.innerHTML += `<span class="badge">${b}</span>`; });
+    if(user.badges && user.badges.length > 0) {
+        user.badges.forEach(b => { badgeContainer.innerHTML += `<span class="badge">${b}</span>`; });
+    }
 
     const bannerEl = document.getElementById('view-banner');
-    if(user.banner.startsWith('data:') || user.banner.startsWith('http')) {
+    if(user.banner && (user.banner.startsWith('data:') || user.banner.startsWith('http'))) {
         bannerEl.style.backgroundImage = `url(${user.banner})`; bannerEl.style.backgroundColor = 'transparent';
     } else {
-        bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = user.banner;
+        bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = user.banner || '#36393f';
     }
     
     const modal = document.getElementById('view-profile-modal');
@@ -205,10 +241,11 @@ window.showUserProfile = function(event, userId) {
     modal.style.top = y + 'px';
 }
 
-// Global click closer for menus/popups (FIXED to not instantly close modals)
+// Global Click Closer (FIXED target logic)
 document.addEventListener('click', (e) => {
-    if(!e.target.closest('#view-profile-modal') && !e.target.closest('.avatar') && !e.target.closest('.username')) {
-        document.getElementById('view-profile-modal').classList.add('hidden');
+    const profileModal = document.getElementById('view-profile-modal');
+    if(profileModal && !profileModal.classList.contains('hidden') && !e.target.closest('#view-profile-modal')) {
+        profileModal.classList.add('hidden');
     }
     if(!e.target.closest('#context-menu')) {
         document.getElementById('context-menu').classList.add('hidden');
@@ -229,7 +266,6 @@ async function goHome() {
     document.querySelector('.home-icon').classList.add('active');
     document.getElementById('sidebar-title').innerText = "Direct Messages";
     
-    // FIX: Completely hide server-specific UI
     document.getElementById('add-friend-btn').classList.remove('hidden');
     document.getElementById('add-channel-btn').classList.add('hidden');
     document.getElementById('server-settings-btn').classList.add('hidden');
@@ -247,7 +283,7 @@ async function goHome() {
         window.userCache[f._id] = f; 
         const dm = data.dms.find(d => d.participants.includes(f._id));
         const div = document.createElement('div'); div.className = 'list-item';
-        div.innerHTML = `<div class="avatar-wrapper"><img src="${f.pfp}" class="avatar" style="width:24px;height:24px;"><div class="status-dot ${f.activity}" style="width:8px;height:8px;bottom:0;right:0;"></div></div> ${f.username}`;
+        div.innerHTML = `<div class="avatar-wrapper"><img src="${f.pfp}" class="avatar" style="width:24px;height:24px;"><div class="status-dot ${f.activity}" style="width:8px;height:8px;bottom:0;right:0;"></div></div> ${f.username} ${f.isVerified?verifiedSVG:''}`;
         div.onclick = (e) => {
             document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
             e.currentTarget.classList.add('active'); selectChat(dm._id, `@${f.username}`);
@@ -280,8 +316,6 @@ async function loadServers() {
     });
 }
 
-const verifiedSVG = `<svg class="verified-badge verified-svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor"/><path d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
 async function selectServer(server) {
     activeServer = server;
     document.getElementById('sidebar-title').innerHTML = `${server.name} ${server.isVerified ? verifiedSVG : ''}`;
@@ -301,7 +335,7 @@ async function selectServer(server) {
 let contextTargetId = null;
 function showContextMenu(e, id, type) {
     e.preventDefault();
-    e.stopPropagation(); // FIX: Prevent immediate closing
+    e.stopPropagation(); 
     if (activeServer && (activeServer.ownerId === currentUser._id || currentUser.isAdmin)) {
         const menu = document.getElementById('context-menu');
         menu.style.left = `${e.pageX}px`;
@@ -433,7 +467,7 @@ async function loadMessages(forceScroll = false) {
                 <img src="${msg.authorId.pfp}" class="avatar" onclick="showUserProfile(event, '${msg.authorId._id}')">
                 <div style="flex:1;">
                     <div class="message-header">
-                        <span class="username" onclick="showUserProfile(event, '${msg.authorId._id}')">${msg.authorId.username}</span>
+                        <span class="username" onclick="showUserProfile(event, '${msg.authorId._id}')">${msg.authorId.username} ${msg.authorId.isVerified?verifiedSVG:''}</span>
                         <span class="timestamp">${time}</span>
                     </div>
                     <div class="text">${safeContent} ${msg.isEdited ? '<span class="is-edited">(edited)</span>' : ''}</div>
@@ -448,7 +482,7 @@ async function loadMessages(forceScroll = false) {
 
 // EMOJI & MENTION LOGIC
 document.getElementById('emoji-btn').addEventListener('click', (e) => {
-    e.stopPropagation(); // FIX: Prevent immediately closing
+    e.stopPropagation(); 
     document.getElementById('emoji-picker').classList.toggle('hidden');
 });
 document.querySelector('emoji-picker').addEventListener('emoji-click', event => {
