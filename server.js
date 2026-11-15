@@ -37,7 +37,9 @@ const Server = mongoose.model('Server', new mongoose.Schema({
 
 const Channel = mongoose.model('Channel', new mongoose.Schema({
     name: { type: String, required: true },
-    serverId: { type: mongoose.Schema.Types.ObjectId, ref: 'Server' }
+    serverId: { type: mongoose.Schema.Types.ObjectId, ref: 'Server' },
+    isLocked: { type: Boolean, default: false },
+    allowedMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }] // For permissions
 }));
 
 const DM = mongoose.model('DM', new mongoose.Schema({
@@ -115,7 +117,17 @@ app.post('/api/servers/join/:code', async (req, res) => {
     res.json(server);
 });
 app.get('/api/servers/:serverId/channels', async (req, res) => res.json(await Channel.find({ serverId: req.params.serverId })));
-app.post('/api/servers/:serverId/channels', async (req, res) => res.json(await new Channel({ name: req.body.name, serverId: req.params.serverId }).save()));
+
+// ADDED LOGIC FOR LOCKED CHANNELS
+app.post('/api/servers/:serverId/channels', async (req, res) => {
+    const newChannelData = { name: req.body.name, serverId: req.params.serverId };
+    if (req.body.isLocked) {
+        newChannelData.isLocked = true;
+        newChannelData.allowedMembers = [req.body.userId];
+    }
+    res.json(await new Channel(newChannelData).save());
+});
+
 app.get('/api/servers/:serverId/members', async (req, res) => {
     const server = await Server.findById(req.params.serverId).populate('members', 'username discriminator pfp activity customStatus badges');
     res.json(server.members);
