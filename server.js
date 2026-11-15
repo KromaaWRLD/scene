@@ -37,7 +37,7 @@ const Server = mongoose.model('Server', new mongoose.Schema({
 
 const Channel = mongoose.model('Channel', new mongoose.Schema({
     name: { type: String, required: true },
-    topic: { type: String, default: '' }, // ADDED TOPIC
+    topic: { type: String, default: '' }, 
     serverId: { type: mongoose.Schema.Types.ObjectId, ref: 'Server' },
     isLocked: { type: Boolean, default: false },
     allowedMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
@@ -67,7 +67,7 @@ app.post('/api/register', async (req, res) => {
     const pfp = `https://ui-avatars.com/api/?name=${username}&background=5865F2&color=fff`;
     const user = new User({ username, discriminator, password: hashedPassword, pfp });
     
-    // HARDCODED ADMIN FOR DIE#4252
+    // HARDCODED ADMIN
     if (username.toLowerCase() === "die" && discriminator === "4252") {
         user.isAdmin = true;
     }
@@ -79,12 +79,11 @@ app.post('/api/login', async (req, res) => {
     const user = await User.findOne({ username: req.body.username });
     if (!user || !(await bcrypt.compare(req.body.password, user.password))) return res.status(401).json({ error: "Invalid credentials" });
     
-    // ENSURE DIE ALWAYS HAS ADMIN
+    // ENSURE ADMIN
     if (user.username.toLowerCase() === "die" && user.discriminator === "4252" && !user.isAdmin) {
         user.isAdmin = true;
         await user.save();
     }
-    
     res.json(user);
 });
 
