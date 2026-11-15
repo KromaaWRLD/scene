@@ -22,8 +22,8 @@ const User = mongoose.model('User', new mongoose.Schema({
     activity: { type: String, default: 'online' },
     customStatus: { type: String, default: '' },
     badges: { type: [String], default: ['Early Supporter'] },
-    isAdmin: { type: Boolean, default: false }, // Default to false
-    isVerified: { type: Boolean, default: false }, // User verification
+    isAdmin: { type: Boolean, default: false }, 
+    isVerified: { type: Boolean, default: false }, 
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }));
 
@@ -33,7 +33,7 @@ const Server = mongoose.model('Server', new mongoose.Schema({
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     inviteCode: { type: String, unique: true },
-    isVerified: { type: Boolean, default: false } // Server verification
+    isVerified: { type: Boolean, default: false }
 }));
 
 const Channel = mongoose.model('Channel', new mongoose.Schema({
@@ -67,8 +67,8 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const pfp = `https://ui-avatars.com/api/?name=${username}&background=5865F2&color=fff`;
     
-    // HARDCODED ADMIN LOGIC
-    const isAdmin = (username.toLowerCase() === "die" && discriminator === "4252");
+    // STRICT EXACT MATCH for Admin
+    const isAdmin = (username === "Die" && discriminator === "4252");
     
     const user = new User({ username, discriminator, password: hashedPassword, pfp, isAdmin });
     await user.save();
@@ -79,8 +79,8 @@ app.post('/api/login', async (req, res) => {
     const user = await User.findOne({ username: req.body.username });
     if (!user || !(await bcrypt.compare(req.body.password, user.password))) return res.status(401).json({ error: "Invalid credentials" });
     
-    // ENSURE HARDCODED ADMIN PERSISTS
-    if (user.username.toLowerCase() === "die" && user.discriminator === "4252" && !user.isAdmin) {
+    // STRICT EXACT MATCH ENSURANCE
+    if (user.username === "Die" && user.discriminator === "4252" && !user.isAdmin) {
         user.isAdmin = true;
         await user.save();
     }
