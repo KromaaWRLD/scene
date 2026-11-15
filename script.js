@@ -6,7 +6,7 @@ let messageInterval = null;
 let replyingToId = null;
 
 window.userCache = {}; 
-window.currentServerMembers = []; // Needed for mention autocomplete
+window.currentServerMembers = [];
 
 function toBase64(file) {
     return new Promise((resolve, reject) => {
@@ -81,7 +81,11 @@ function updateUserPanel() {
     document.getElementById('my-pfp').src = currentUser.pfp;
     const dot = document.getElementById('my-activity-dot');
     dot.className = `status-dot ${currentUser.activity || 'online'}`;
-    if(currentUser.isAdmin) document.getElementById('tab-admin').style.display = 'block';
+    
+    // FIX: Show Admin Panel Tab if user is Admin
+    if(currentUser.isAdmin === true) {
+        document.getElementById('tab-admin').style.display = 'block';
+    }
 }
 
 function showSettingsPane(id) {
@@ -89,13 +93,17 @@ function showSettingsPane(id) {
     document.querySelectorAll('.settings-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(id).classList.remove('hidden');
     event.target.classList.add('active');
+    
     if(id === 'settings-admin-panel') loadAdminPanel();
 }
 
 function openUserSettings() {
     document.getElementById('settings-screen').classList.remove('hidden');
     document.getElementById('settings-header').innerText = "USER SETTINGS";
+    
+    // Ensure Server tab is hidden when viewing User settings
     document.getElementById('tab-server').style.display = 'none';
+    
     showSettingsPane('settings-user-panel');
     document.getElementById('set-preview-name').innerText = `${currentUser.username}#${currentUser.discriminator}`;
     document.getElementById('set-preview-pfp').src = currentUser.pfp;
@@ -157,11 +165,14 @@ async function adminDeleteUser(id) { await fetch(`${API_URL}/admin/users/${id}`,
 async function adminDeleteServer(id) { await fetch(`${API_URL}/servers/${id}`, { method: 'DELETE' }); loadAdminPanel(); loadServers(); }
 async function adminToggleVerify(id, status) { await fetch(`${API_URL}/admin/servers/verify/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ isVerified: status }) }); loadAdminPanel(); loadServers(); }
 
-
 // --- PROFILES ---
 window.showUserProfile = function(event, userId) {
+    // FIX: Stop propagation so the global click listener doesn't immediately close it
+    event.stopPropagation();
+    
     const user = window.userCache[userId];
     if(!user) return;
+    
     document.getElementById('view-username').innerText = user.username;
     document.getElementById('view-disc').innerText = `#${user.discriminator}`;
     document.getElementById('view-pfp').src = user.pfp;
@@ -184,17 +195,19 @@ window.showUserProfile = function(event, userId) {
     
     const modal = document.getElementById('view-profile-modal');
     modal.classList.remove('hidden');
+    
     let x = event.clientX + 10;
     let y = event.clientY + 10;
     if (x + 300 > window.innerWidth) x = window.innerWidth - 320;
     if (y + 400 > window.innerHeight) y = window.innerHeight - 420;
+    
     modal.style.left = x + 'px';
     modal.style.top = y + 'px';
 }
 
-// Global click closer for menus/popups
+// Global click closer for menus/popups (FIXED to not instantly close modals)
 document.addEventListener('click', (e) => {
-    if(!e.target.closest('#view-profile-modal') && !e.target.classList.contains('avatar') && !e.target.classList.contains('username')) {
+    if(!e.target.closest('#view-profile-modal') && !e.target.closest('.avatar') && !e.target.closest('.username')) {
         document.getElementById('view-profile-modal').classList.add('hidden');
     }
     if(!e.target.closest('#context-menu')) {
@@ -215,10 +228,13 @@ async function goHome() {
     document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
     document.querySelector('.home-icon').classList.add('active');
     document.getElementById('sidebar-title').innerText = "Direct Messages";
+    
+    // FIX: Completely hide server-specific UI
     document.getElementById('add-friend-btn').classList.remove('hidden');
     document.getElementById('add-channel-btn').classList.add('hidden');
     document.getElementById('server-settings-btn').classList.add('hidden');
     document.getElementById('member-list').classList.add('hidden');
+    document.getElementById('current-chat-topic').innerText = ""; 
     document.getElementById('messages-container').innerHTML = '';
     
     const res = await fetch(`${API_URL}/users/${currentUser._id}/friends`);
@@ -241,12 +257,10 @@ async function goHome() {
         if(!firstFriendDiv) firstFriendDiv = div;
     });
 
-    // AUTO-LOAD FIRST DM
     if(firstFriendDiv) {
         firstFriendDiv.click();
     } else {
         document.getElementById('current-chat-name').innerText = "No Friends Yet";
-        document.getElementById('current-chat-topic').innerText = "";
         currentTargetId = null;
     }
 }
@@ -283,11 +297,11 @@ async function selectServer(server) {
     loadMembers(server._id);
 }
 
-// RIGHT CLICK CONTEXT MENU LOGIC
+// RIGHT CLICK CONTEXT MENU
 let contextTargetId = null;
 function showContextMenu(e, id, type) {
     e.preventDefault();
-    // Only owner/admin can delete channels
+    e.stopPropagation(); // FIX: Prevent immediate closing
     if (activeServer && (activeServer.ownerId === currentUser._id || currentUser.isAdmin)) {
         const menu = document.getElementById('context-menu');
         menu.style.left = `${e.pageX}px`;
@@ -317,7 +331,6 @@ async function loadChannels(serverId) {
         const div = document.createElement('div'); div.className = 'list-item';
         div.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> ${c.name} ${lockIcon}`;
         
-        // Right Click Listener
         div.addEventListener('contextmenu', (e) => showContextMenu(e, c._id, 'channel'));
         
         div.onclick = (e) => {
@@ -344,7 +357,7 @@ async function loadChannels(serverId) {
 async function loadMembers(serverId) {
     const res = await fetch(`${API_URL}/servers/${serverId}/members`);
     const members = await res.json();
-    window.currentServerMembers = members; // Cache globally for @mentions
+    window.currentServerMembers = members; 
     const container = document.getElementById('members-container'); container.innerHTML = '';
     members.forEach(m => {
         window.userCache[m._id] = m; 
@@ -354,7 +367,6 @@ async function loadMembers(serverId) {
         container.appendChild(div);
     });
 }
-
 
 // --- MESSAGES ---
 function selectChat(targetId, chatName, topic = "") {
@@ -434,8 +446,9 @@ async function loadMessages(forceScroll = false) {
     if(isAtBottom || forceScroll) container.scrollTop = container.scrollHeight;
 }
 
-// EMOJI PICKER LOGIC
-document.getElementById('emoji-btn').addEventListener('click', () => {
+// EMOJI & MENTION LOGIC
+document.getElementById('emoji-btn').addEventListener('click', (e) => {
+    e.stopPropagation(); // FIX: Prevent immediately closing
     document.getElementById('emoji-picker').classList.toggle('hidden');
 });
 document.querySelector('emoji-picker').addEventListener('emoji-click', event => {
@@ -445,7 +458,6 @@ document.querySelector('emoji-picker').addEventListener('emoji-click', event => 
     input.focus();
 });
 
-// @ MENTION AUTOCOMPLETE LOGIC
 document.getElementById('message-input').addEventListener('input', (e) => {
     const val = e.target.value;
     const match = val.match(/@(\w*)$/);
@@ -481,7 +493,7 @@ document.getElementById('message-form').addEventListener('submit', async (e) => 
     cancelReply(); loadMessages(true);
 });
 
-// Utility Modals
+// Modals
 function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function hideModal(id) { document.getElementById(id).classList.add('hidden'); }
 async function addFriend() { await fetch(`${API_URL}/friends/add`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ currentUserId: currentUser._id, friendTag: document.getElementById('friend-tag').value }) }); hideModal('friend-modal'); goHome(); }
