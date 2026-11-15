@@ -172,9 +172,6 @@ body {
     color: #72767d;
 }
 
-
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidden; }
 .hidden { display: none !important; }
 .screen { height: 100vh; width: 100vw; display: flex; }
 
@@ -190,9 +187,7 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 .server-list { width: 72px; background-color: #202225; display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 8px; overflow-y: auto; z-index: 10;}
 .server-icon { width: 48px; height: 48px; background-color: #36393f; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; color: white; font-weight: bold; transition: 0.2s; background-size: cover; background-position: center; position: relative; }
 .server-icon:hover, .server-icon.active { border-radius: 16px; background-color: #5865F2; }
-.sidebar { width: 240px; background-color: #2f3136; display: flex; flex-direction: column; }
 .sidebar-header { padding: 16px; border-bottom: 1px solid #202225; display: flex; justify-content: space-between; }
-.channel-list { flex: 1; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .list-item { padding: 8px; cursor: pointer; border-radius: 4px; color: #8e9297; display: flex; align-items: center; gap: 8px; }
 .list-item:hover, .list-item.active { background: #393c43; color: white; }
 
@@ -206,7 +201,6 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 .verified-badge { margin-left: 4px; display: inline-flex; align-items: center; justify-content: center; }
 
 .user-panel { background: #292b2f; padding: 12px; display: flex; align-items: center; gap: 8px; }
-.avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer; }
 .user-info { flex: 1; font-size: 14px; color: white; font-weight: bold; overflow: hidden; }
 .status { font-size: 12px; color: #b9bbbe; font-weight: normal; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 
@@ -219,10 +213,7 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 .member-item .username { color: #dcddde; font-size: 14px; font-weight: 500;}
 .member-item .status-dot { border-color: #2f3136; }
 
-/* Chat Area */
-.chat-area { flex: 1; display: flex; flex-direction: column; background-color: #36393f; min-width: 0; }
-.chat-header { padding: 16px; border-bottom: 1px solid #202225; color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.2); display: flex; align-items: center;}
-.messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+/* Chat Area Details */
 .message-wrapper { position: relative; }
 .message { display: flex; gap: 16px; position: relative; padding: 4px 16px; margin: 0 -16px; border-radius: 4px; }
 .message:hover { background-color: #32353b; }
@@ -232,23 +223,20 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 .message-actions button:hover { background: #40444b; color: white; }
 .message-actions button.del:hover { background: #ed4245; color: white; }
 
-.message-header { display: flex; gap: 8px; align-items: baseline; }
 .message-header .username { color: white; font-weight: bold; cursor: pointer; }
 .message-header .username:hover { text-decoration: underline; }
-.message-header .timestamp { color: #72767d; font-size: 12px; margin-left: 4px; }
 .is-edited { font-size: 11px; color: #72767d; margin-left: 4px; }
 
-/* Replies */
+/* REPLIES & MENTIONS */
 .reply-context { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #b9bbbe; margin-bottom: 4px; margin-left: 56px; position: relative; }
 .reply-context::before { content: ''; position: absolute; left: -28px; top: 8px; width: 24px; height: 12px; border-left: 2px solid #4f545c; border-top: 2px solid #4f545c; border-top-left-radius: 6px; }
 .reply-context .rep-user { font-weight: bold; color: white; }
 #reply-banner { background: #2f3136; padding: 8px 16px; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; font-size: 13px; border-left: 4px solid #5865F2;}
 .close-reply { background: none; border: none; color: white; cursor: pointer; }
-
-/* Inputs */
-.input-area { padding: 0 16px 24px 16px; }
-#message-input { width: 100%; padding: 14px 16px; background: #40444b; border: none; border-radius: 8px; color: white; outline: none; font-size: 15px; }
 #reply-banner:not(.hidden) + form #message-input { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+.mention { color: #5865F2; background: rgba(88,101,242,0.1); padding: 0 4px; border-radius: 4px; cursor: pointer; font-weight: 500; }
+.mention:hover { background: rgba(88,101,242,0.3); text-decoration: underline; }
 
 /* Settings */
 .full-screen-modal { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: #36393f; z-index: 1000; display: flex; }
@@ -290,7 +278,12 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 .profile-section p { color: #dcddde; font-size: 14px; }
 .close-profile { width: 100%; padding: 10px; background: #36393f; border: none; color: white; cursor: pointer; font-weight: bold; border-top: 1px solid #202225; }
 
+/* Modals */
 .modal { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+
+/* SMALL POPOUT MODAL (Replaces big screen blocker) */
+.profile-popout { position: fixed; z-index: 3000; background: transparent; }
+
 .modal-content { background: #36393f; padding: 24px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px; width: 350px; }
 .modal-content input { padding: 10px; background: #202225; border: none; color: white; border-radius: 4px; outline: none; }
 .modal-content button { padding: 10px; background: #5865F2; border: none; color: white; border-radius: 4px; cursor: pointer; font-weight: bold; }
