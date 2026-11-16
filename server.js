@@ -621,5 +621,9 @@ app.put('/api/admin/tickets/:id', async (req, res) => {
     res.json(t);
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+if (process.env.VERCEL !== '1') {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+module.exports = app;
