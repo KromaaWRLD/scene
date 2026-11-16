@@ -64,6 +64,7 @@
             <div class="user-panel">
                 <div class="avatar-wrapper">
                     <img id="my-pfp" src="" class="avatar">
+                    <img id="my-decoration" src="" class="avatar-decoration hidden">
                     <div id="my-activity-dot" class="status-dot"></div>
                 </div>
                 <div class="user-info">
@@ -105,7 +106,6 @@
 
         <!-- Members List -->
         <aside class="member-list hidden" id="member-list">
-            <h3 class="member-role">Members</h3>
             <div id="members-container"></div>
         </aside>
     </div>
@@ -122,7 +122,10 @@
             <div class="settings-tab active" id="tab-my-account" onclick="showSettingsPane('settings-user-panel', this)">My Account</div>
             <div class="settings-tab" id="tab-support" onclick="showSettingsPane('settings-support-panel', this)">Support & Rules</div>
             <div class="settings-tab" id="tab-admin" onclick="showSettingsPane('settings-admin-panel', this)" style="display:none; color:#faa61a;">Admin Panel</div>
+            
+            <!-- Server Settings Tabs -->
             <div class="settings-tab" id="tab-server" onclick="showSettingsPane('settings-server-panel', this)" style="display:none;">Server Overview</div>
+            <div class="settings-tab" id="tab-server-roles" onclick="showSettingsPane('settings-roles-panel', this)" style="display:none;">Roles</div>
             
             <div class="divider" style="margin: 8px 0;"></div>
             <div class="settings-tab danger" onclick="logout()">Log Out</div>
@@ -135,8 +138,11 @@
                 <h2>My Account</h2>
                 <div class="profile-card">
                     <div class="profile-banner" id="set-preview-banner"></div>
-                    <img class="profile-avatar" id="set-preview-pfp" src="">
-                    <div class="profile-info"><h2 id="set-preview-name">User#0000</h2></div>
+                    <div class="avatar-wrapper profile-avatar-wrapper">
+                        <img class="profile-avatar" id="set-preview-pfp" src="">
+                        <img class="avatar-decoration large hidden" id="set-preview-decoration" src="">
+                    </div>
+                    <div class="profile-info" style="padding-top: 56px;"><h2 id="set-preview-name">User#0000</h2></div>
                 </div>
                 <label>Activity Status</label>
                 <select id="set-activity">
@@ -151,6 +157,14 @@
                 <input type="file" id="upload-pfp" accept="image/*">
                 <label>Upload Banner</label>
                 <input type="file" id="upload-banner" accept="image/*">
+                
+                <!-- AVATAR DECORATION PICKER -->
+                <div id="user-decoration-section">
+                    <label>Avatar Decoration</label>
+                    <div id="user-decoration-disabled-msg" class="hidden" style="font-size:12px; color:#ed4245;">Avatar decorations are currently disabled for regular users by an Admin.</div>
+                    <div id="user-decoration-grid" class="decoration-grid"></div>
+                </div>
+
                 <label>About Me (Bio)</label>
                 <textarea id="set-bio" rows="3"></textarea>
                 <button class="save-btn" onclick="saveProfile()">Save Changes</button>
@@ -190,16 +204,34 @@
                 <button class="save-btn danger" onclick="deleteServer()">Delete Server</button>
             </div>
 
+            <!-- SERVER ROLES CREATION & MANAGEMENT PANE -->
+            <div id="settings-roles-panel" class="settings-pane hidden">
+                <h2>Server Roles</h2>
+                <div class="admin-card">
+                    <h3>Create New Role</h3>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" id="new-role-name" placeholder="Role Name (e.g. Moderator, VIP)">
+                        <input type="color" id="new-role-color" value="#5865F2" style="width:50px; height:38px; border:none; background:none; cursor:pointer;">
+                        <button class="save-btn" style="margin-top:0;" onclick="createServerRole()">Create Role</button>
+                    </div>
+                </div>
+
+                <label style="margin-top:16px;">Existing Roles</label>
+                <div id="server-roles-list" class="admin-list"></div>
+
+                <label style="margin-top:16px;">Assign Roles to Members</label>
+                <div id="server-member-roles-list" class="admin-list" style="max-height:300px;"></div>
+            </div>
+
             <!-- EXPANDED SYSTEM ADMIN PANEL -->
             <div id="settings-admin-panel" class="settings-pane hidden" style="max-width: 850px;">
                 <h2 style="color:#faa61a;">System Admin Dashboard</h2>
                 
-                <!-- Sub-Navigation Tabs -->
                 <div class="admin-subtabs">
                     <button class="admin-subtab active" onclick="switchAdminSubtab('adm-users', this)">Users & Mod</button>
                     <button class="admin-subtab" onclick="switchAdminSubtab('adm-servers', this)">Servers & Channels</button>
                     <button class="admin-subtab" onclick="switchAdminSubtab('adm-messages', this)">Messages & System</button>
-                    <button class="admin-subtab" onclick="switchAdminSubtab('adm-community', this)">Badges, Tickets & Rules</button>
+                    <button class="admin-subtab" onclick="switchAdminSubtab('adm-community', this)">Decorations, Badges & Rules</button>
                     <button class="admin-subtab" onclick="switchAdminSubtab('adm-audit', this)">Audit Logs</button>
                 </div>
 
@@ -246,9 +278,22 @@
                     </div>
                 </div>
 
-                <!-- 4. COMMUNITY, BADGES, TICKETS & CHANGELOG -->
+                <!-- 4. AVATAR DECORATIONS, BADGES, TICKETS & CHANGELOG -->
                 <div id="adm-community" class="admin-subpane hidden">
+                    <!-- AVATAR DECORATION UPLOAD & TOGGLE -->
                     <div class="admin-card">
+                        <h3>Avatar Decoration Studio</h3>
+                        <label class="checkbox-row"><input type="checkbox" id="cfg-nonadmin-decorations" onchange="toggleNonAdminDecorations()"> <span>Allow Non-Admins to Wear Avatar Decorations (Admins can always wear them)</span></label>
+                        
+                        <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+                            <input type="text" id="new-decoration-name" placeholder="Decoration Name (e.g. Gold Ring)" style="flex:1;">
+                            <input type="file" id="new-decoration-file" accept="image/*" style="flex:1; color:#b9bbbe;">
+                            <button class="save-btn" style="margin-top:0;" onclick="uploadAvatarDecoration()">Upload</button>
+                        </div>
+                        <div id="admin-decoration-list" class="decoration-grid" style="margin-top:10px;"></div>
+                    </div>
+
+                    <div class="admin-card" style="margin-top:16px;">
                         <h3>Badge Creator Studio</h3>
                         <div style="display:flex; gap:8px;">
                             <input type="text" id="new-badge-name" placeholder="Badge Name (e.g. VIP)">
@@ -296,12 +341,17 @@
             <div class="profile-banner" id="view-banner"></div>
             <div class="avatar-wrapper profile-avatar-wrapper">
                 <img class="profile-avatar" id="view-pfp" src="">
+                <img class="avatar-decoration large hidden" id="view-decoration" src="">
                 <div id="view-activity-dot" class="status-dot large"></div>
             </div>
             <div class="profile-info" style="padding-top: 56px;">
                 <h2 id="view-username" style="display:flex; align-items:center; gap:4px;">User<span id="view-disc">#0000</span> <span id="view-verified-badge"></span></h2>
                 <div id="view-badges" class="badges-container"></div>
                 <div class="profile-status" id="view-status"></div>
+                <div id="view-roles-section" class="profile-section hidden">
+                    <h4>Server Roles</h4>
+                    <div id="view-roles" class="badges-container"></div>
+                </div>
                 <div class="profile-section">
                     <h4>About Me</h4>
                     <p id="view-bio"></p>
