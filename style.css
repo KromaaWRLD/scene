@@ -25,7 +25,7 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 /* AVATAR DECORATION OVERLAYS */
 .avatar-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .avatar-decoration { position: absolute; top: -18%; left: -18%; width: 136%; height: 136%; pointer-events: none; z-index: 2; object-fit: contain; }
-.avatar-decoration.large { top: -16%; left: -16%; width: 132%; height: 132%; }
+.avatar-decoration.large { top: -21%; left: -21%; width: 142%; height: 142%; }
 
 .decoration-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 10px; margin-top: 6px; }
 .decoration-card { background: #202225; border: 2px solid transparent; border-radius: 8px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; text-align: center; font-size: 12px; position: relative; }
@@ -129,9 +129,8 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 .admin-item button { padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 12px; }
 .btn-verify { background: #5865F2; } .btn-del { background: #ed4245; } .btn-manage { background: #43b581; }
 
-.profile-card { background: #292b2f; width: 300px; border-radius: 8px; overflow: hidden; position: relative; }
-.profile-banner { height: 120px; background-size: cover; background-position: center; background-color: #36393f; }
-.profile-avatar-wrapper { position: absolute; top: 76px; left: 16px; }
+.profile-card { background: #292b2f; width: 300px; border-radius: 8px; overflow: visible; position: relative; }
+.profile-banner { height: 120px; background-size: cover; background-position: center; background-color: #36393f; border-top-left-radius: 8px; border-top-right-radius: 8px; }.profile-avatar-wrapper { position: absolute; top: 76px; left: 16px; }
 .profile-avatar { width: 80px; height: 80px; border-radius: 50%; border: 6px solid #292b2f; background: #36393f; object-fit: cover; }
 .profile-info { padding: 16px; }
 .profile-info h2 { color: white; font-size: 20px; }
