@@ -24,7 +24,7 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 
 /* AVATAR DECORATION OVERLAYS */
 .avatar-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.avatar-decoration { position: absolute; top: -18%; left: -18%; width: 136%; height: 136%; pointer-events: none; z-index: 2; object-fit: contain; }
+.avatar-decoration { position: absolute; top: -18%; left: -18%; width: 136%; height: 136%; pointer-events: none; z-index: 1; object-fit: contain; }
 .avatar-decoration.large { top: -21%; left: -21%; width: 142%; height: 142%; }
 
 .decoration-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 10px; margin-top: 6px; }
