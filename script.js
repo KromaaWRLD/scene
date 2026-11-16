@@ -1,6 +1,6 @@
 const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api';
 let currentUser = JSON.parse(localStorage.getItem('scene_user'));
-let realAdminUser = null; // Stores original admin when impersonating
+let realAdminUser = null;
 let currentTargetId = null;
 let activeServer = null;
 let messageInterval = null;
@@ -8,9 +8,12 @@ let heartbeatInterval = null;
 let replyingToId = null;
 let lastRenderedHash = "";
 let globalConfig = {};
+let selectedUserDecoration = "";
 
 window.userCache = {};
 window.currentServerMembers = [];
+window.currentServerRoles = [];
+window.currentServerMemberRoles = [];
 window.adminUsersList = [];
 window.adminServersList = [];
 let selectedAdminUser = null;
@@ -25,6 +28,21 @@ function toBase64(file) {
         reader.onload = () => resolve(reader.result);
         reader.onerror = error => reject(error);
     });
+}
+
+function getEffectiveDecoration(user) {
+    if (!user || !user.avatarDecoration) return '';
+    if (globalConfig.allowNonAdminDecorations === false && !user.isAdmin) return '';
+    return user.avatarDecoration;
+}
+
+function getUserServerRoles(userId) {
+    if (!activeServer) return [];
+    const entry = window.currentServerMemberRoles.find(mr => mr.userId === userId);
+    if (!entry || !entry.roleIds) return [];
+    return entry.roleIds
+        .map(rid => window.currentServerRoles.find(r => r._id === rid))
+        .filter(Boolean);
 }
 
 window.onload = () => {
@@ -78,16 +96,16 @@ function logout() { localStorage.removeItem('scene_user'); location.reload(); }
 async function showApp() {
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('app-screen').classList.remove('hidden');
+    await runHeartbeat();
     updateUserPanel();
     loadServers();
     goHome();
     checkInvite();
-    await runHeartbeat();
     if (heartbeatInterval) clearInterval(heartbeatInterval);
-    heartbeatInterval = setInterval(runHeartbeat, 5000);
+    heartbeatInterval = setInterval(runHeartbeat, 4000);
 }
 
-// --- HEARTBEAT (WARNINGS, MAINTENANCE, SUSPENSIONS, CHANGELOG) ---
+// --- HEARTBEAT ---
 async function runHeartbeat() {
     if (!currentUser) return;
     try {
@@ -96,34 +114,36 @@ async function runHeartbeat() {
         const data = await res.json();
         globalConfig = data.config || {};
 
-        // Kick out non-admins if Maintenance Mode was just turned on
         if (data.maintenanceMode && !currentUser.isAdmin && !realAdminUser) {
             alert("Scene has entered Maintenance Mode.");
             logout();
             return;
         }
 
-        // Kick out if newly suspended
         if (data.user.suspendedUntil && new Date(data.user.suspendedUntil) > new Date() && !realAdminUser) {
             alert(`Your account was suspended until ${new Date(data.user.suspendedUntil).toLocaleString()}`);
             logout();
             return;
         }
 
-        // Show live Admin Warning Popup
+        // Sync decoration state if admin toggled non-admin permissions
+        if (currentUser.avatarDecoration !== data.user.avatarDecoration) {
+            currentUser.avatarDecoration = data.user.avatarDecoration;
+            localStorage.setItem('scene_user', JSON.stringify(currentUser));
+            updateUserPanel();
+        }
+
         if (data.warning) {
             document.getElementById('system-warning-text').innerText = data.warning;
             showModal('system-warning-modal');
         }
 
-        // Show Changelog modal if version changed
         if (globalConfig.changelogVersion && localStorage.getItem('seen_changelog') !== globalConfig.changelogVersion) {
             document.getElementById('changelog-modal-title').innerText = `What's New (${globalConfig.changelogVersion})`;
             document.getElementById('changelog-modal-body').innerText = globalConfig.changelogText;
             showModal('changelog-modal');
         }
 
-        // Apply global emoji toggle to UI
         document.getElementById('emoji-btn').style.display = globalConfig.allowEmojis === false ? 'none' : 'inline-block';
     } catch (e) { /* ignore network blips */ }
 }
@@ -140,6 +160,16 @@ function updateUserPanel() {
     document.getElementById('my-username').innerText = currentUser.username;
     document.getElementById('my-custom-status').innerText = currentUser.customStatus || 'Online';
     document.getElementById('my-pfp').src = currentUser.pfp;
+
+    const myDec = document.getElementById('my-decoration');
+    const effectiveDec = getEffectiveDecoration(currentUser);
+    if (effectiveDec) {
+        myDec.src = effectiveDec;
+        myDec.classList.remove('hidden');
+    } else {
+        myDec.classList.add('hidden');
+    }
+
     const dot = document.getElementById('my-activity-dot');
     dot.className = `status-dot ${currentUser.activity || 'online'}`;
 
@@ -164,6 +194,7 @@ function showSettingsPane(id, tabEl = null) {
     }
     if (id === 'settings-admin-panel') loadAdminPanel();
     if (id === 'settings-support-panel') loadUserSupportPane();
+    if (id === 'settings-roles-panel') loadServerRolesPane();
 }
 
 function openAdminSettingsQuickly() {
@@ -173,10 +204,11 @@ function openAdminSettingsQuickly() {
     document.getElementById('tab-support').style.display = 'block';
     document.getElementById('tab-admin').style.display = 'block';
     document.getElementById('tab-server').style.display = 'none';
+    document.getElementById('tab-server-roles').style.display = 'none';
     showSettingsPane('settings-admin-panel', document.getElementById('tab-admin'));
 }
 
-function openUserSettings() {
+async function openUserSettings() {
     document.getElementById('settings-screen').classList.remove('hidden');
     document.getElementById('settings-header').innerText = "USER SETTINGS";
 
@@ -184,6 +216,7 @@ function openUserSettings() {
     document.getElementById('tab-support').style.display = 'block';
     if (currentUser.isAdmin && !realAdminUser) document.getElementById('tab-admin').style.display = 'block';
     document.getElementById('tab-server').style.display = 'none';
+    document.getElementById('tab-server-roles').style.display = 'none';
 
     showSettingsPane('settings-user-panel', document.getElementById('tab-my-account'));
 
@@ -192,12 +225,67 @@ function openUserSettings() {
     document.getElementById('set-bio').value = currentUser.bio || '';
     document.getElementById('set-activity').value = currentUser.activity || 'online';
     document.getElementById('set-custom-status').value = currentUser.customStatus || '';
+
     const bannerEl = document.getElementById('set-preview-banner');
     if (currentUser.banner && (currentUser.banner.startsWith('data:') || currentUser.banner.startsWith('http'))) {
         bannerEl.style.backgroundImage = `url(${currentUser.banner})`; bannerEl.style.backgroundColor = 'transparent';
     } else {
         bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = currentUser.banner || '#36393f';
     }
+
+    // Load latest config for Avatar Decorations
+    const cfgRes = await fetch(`${API_URL}/config`);
+    globalConfig = await cfgRes.json();
+    selectedUserDecoration = getEffectiveDecoration(currentUser);
+    renderUserDecorationPicker();
+}
+
+function renderUserDecorationPicker() {
+    const previewDec = document.getElementById('set-preview-decoration');
+    if (selectedUserDecoration) {
+        previewDec.src = selectedUserDecoration;
+        previewDec.classList.remove('hidden');
+    } else {
+        previewDec.classList.add('hidden');
+    }
+
+    const canWear = currentUser.isAdmin || globalConfig.allowNonAdminDecorations !== false;
+    const disabledMsg = document.getElementById('user-decoration-disabled-msg');
+    const grid = document.getElementById('user-decoration-grid');
+    grid.innerHTML = '';
+
+    if (!canWear) {
+        disabledMsg.classList.remove('hidden');
+        return;
+    }
+    disabledMsg.classList.add('hidden');
+
+    // "None" option
+    const noneCard = document.createElement('div');
+    noneCard.className = `decoration-card ${!selectedUserDecoration ? 'selected' : ''}`;
+    noneCard.innerHTML = `<div style="width:44px;height:44px;border-radius:50%;background:#36393f;display:flex;align-items:center;justify-content:center;color:#72767d;font-size:18px;">✕</div><span>None</span>`;
+    noneCard.onclick = () => {
+        selectedUserDecoration = '';
+        renderUserDecorationPicker();
+    };
+    grid.appendChild(noneCard);
+
+    (globalConfig.avatarDecorations || []).forEach(dec => {
+        const card = document.createElement('div');
+        card.className = `decoration-card ${selectedUserDecoration === dec.image ? 'selected' : ''}`;
+        card.innerHTML = `
+            <div class="avatar-wrapper" style="width:44px;height:44px;">
+                <img src="${currentUser.pfp}" class="avatar" style="width:44px;height:44px;">
+                <img src="${dec.image}" class="avatar-decoration">
+            </div>
+            <span>${dec.name}</span>
+        `;
+        card.onclick = () => {
+            selectedUserDecoration = dec.image;
+            renderUserDecorationPicker();
+        };
+        grid.appendChild(card);
+    });
 }
 
 function openServerSettings() {
@@ -208,11 +296,95 @@ function openServerSettings() {
     document.getElementById('tab-support').style.display = 'none';
     document.getElementById('tab-admin').style.display = 'none';
     document.getElementById('tab-server').style.display = 'block';
+    document.getElementById('tab-server-roles').style.display = 'block';
 
     showSettingsPane('settings-server-panel', document.getElementById('tab-server'));
 
     document.getElementById('edit-server-name').value = activeServer.name;
     document.getElementById('server-invite-link').value = `${window.location.origin}/?invite=${activeServer.inviteCode}`;
+}
+
+// --- SERVER ROLES MANAGEMENT ---
+async function loadServerRolesPane() {
+    if (!activeServer) return;
+    const res = await fetch(`${API_URL}/servers/${activeServer._id}/members`);
+    const data = await res.json();
+    window.currentServerMembers = data.members;
+    window.currentServerRoles = data.roles || [];
+    window.currentServerMemberRoles = data.memberRoles || [];
+    activeServer.roles = window.currentServerRoles;
+    activeServer.memberRoles = window.currentServerMemberRoles;
+
+    const rolesList = document.getElementById('server-roles-list');
+    rolesList.innerHTML = window.currentServerRoles.length ? '' : '<div style="color:#72767d;font-size:13px;">No custom roles created yet.</div>';
+    window.currentServerRoles.forEach(r => {
+        rolesList.innerHTML += `<div class="admin-item">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="role-dot" style="background:${r.color}; width:14px; height:14px;"></span>
+                <b style="color:${r.color};">${r.name}</b>
+            </div>
+            <button class="btn-del" onclick="deleteServerRole('${r._id}')">Delete</button>
+        </div>`;
+    });
+
+    const memberRolesList = document.getElementById('server-member-roles-list');
+    memberRolesList.innerHTML = '';
+    window.currentServerMembers.forEach(m => {
+        const assigned = getUserServerRoles(m._id);
+        const badgesHtml = assigned.map(r => `<span class="badge" style="background:${r.color};">${r.name} <span style="cursor:pointer;margin-left:4px;" onclick="toggleMemberRole('${m._id}', '${r._id}', 'remove')">✕</span></span>`).join('');
+        const optionsHtml = window.currentServerRoles.map(r => `<option value="${r._id}">${r.name}</option>`).join('');
+
+        memberRolesList.innerHTML += `<div class="admin-item" style="flex-direction:column; align-items:flex-start;">
+            <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <img src="${m.pfp}" style="width:24px;height:24px;border-radius:50%;">
+                    <b>${m.username}#${m.discriminator}</b>
+                </div>
+                ${window.currentServerRoles.length ? `
+                <div style="display:flex; gap:4px;">
+                    <select id="role-select-${m._id}" style="padding:4px 8px; background:#18191c; color:white; border:none; border-radius:4px; font-size:12px;">${optionsHtml}</select>
+                    <button class="btn-manage" onclick="assignSelectedRole('${m._id}')">+ Role</button>
+                </div>` : ''}
+            </div>
+            <div class="badges-container" style="margin-top:4px;">${badgesHtml || '<span style="font-size:11px;color:#72767d;">No roles</span>'}</div>
+        </div>`;
+    });
+}
+
+async function createServerRole() {
+    const name = document.getElementById('new-role-name').value.trim();
+    const color = document.getElementById('new-role-color').value;
+    if (!name) return alert("Enter a role name.");
+    await fetch(`${API_URL}/servers/${activeServer._id}/roles`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color })
+    });
+    document.getElementById('new-role-name').value = '';
+    await loadServerRolesPane();
+    loadMembers(activeServer._id);
+}
+
+async function deleteServerRole(roleId) {
+    await fetch(`${API_URL}/servers/${activeServer._id}/roles/${roleId}`, { method: 'DELETE' });
+    await loadServerRolesPane();
+    loadMembers(activeServer._id);
+}
+
+async function assignSelectedRole(userId) {
+    const roleId = document.getElementById(`role-select-${userId}`).value;
+    if (!roleId) return;
+    await toggleMemberRole(userId, roleId, 'add');
+}
+
+async function toggleMemberRole(userId, roleId, action) {
+    await fetch(`${API_URL}/servers/${activeServer._id}/members/${userId}/roles`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roleId, action })
+    });
+    await loadServerRolesPane();
+    loadMembers(activeServer._id);
+    lastRenderedHash = "";
+    loadMessages(false);
 }
 
 async function saveProfile() {
@@ -223,12 +395,26 @@ async function saveProfile() {
     let bannerData = currentUser.banner;
     if (pfpFile) pfpData = await toBase64(pfpFile);
     if (bannerFile) bannerData = await toBase64(bannerFile);
-    const updates = { pfp: pfpData, banner: bannerData, bio: document.getElementById('set-bio').value, activity: document.getElementById('set-activity').value, customStatus: document.getElementById('set-custom-status').value };
+
+    const updates = {
+        pfp: pfpData,
+        banner: bannerData,
+        avatarDecoration: selectedUserDecoration,
+        bio: document.getElementById('set-bio').value,
+        activity: document.getElementById('set-activity').value,
+        customStatus: document.getElementById('set-custom-status').value
+    };
     const res = await fetch(`${API_URL}/users/${currentUser._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+    if (!res.ok) {
+        const err = await res.json();
+        return alert(err.error || "Failed to update profile.");
+    }
     currentUser = await res.json();
     localStorage.setItem('scene_user', JSON.stringify(currentUser));
     updateUserPanel();
     closeSettings();
+    lastRenderedHash = "";
+    loadMessages(false);
 }
 
 async function saveServer() { await fetch(`${API_URL}/servers/${activeServer._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('edit-server-name').value }) }); closeSettings(); loadServers(); }
@@ -283,7 +469,6 @@ function switchAdminSubtab(paneId, btnEl) {
 }
 
 async function loadAdminPanel() {
-    // 1. Load Users
     const uRes = await fetch(`${API_URL}/admin/users`);
     window.adminUsersList = await uRes.json();
     const uContainer = document.getElementById('admin-user-list');
@@ -311,7 +496,6 @@ async function loadAdminPanel() {
         </div>`;
     });
 
-    // 2. Load Servers
     const sRes = await fetch(`${API_URL}/admin/servers`);
     window.adminServersList = await sRes.json();
     const sContainer = document.getElementById('admin-server-list');
@@ -333,14 +517,14 @@ async function loadAdminPanel() {
         </div>`;
     });
 
-    // 3. Load System Config & Channels for System Message
     const cfgRes = await fetch(`${API_URL}/config`);
     const cfg = await cfgRes.json();
     globalConfig = cfg;
     document.getElementById('cfg-maintenance').checked = cfg.maintenanceMode || false;
     document.getElementById('cfg-emojis').checked = cfg.allowEmojis !== false;
     document.getElementById('cfg-mentions').checked = cfg.allowMentions !== false;
-    document.getElementById('cfg-rate-count').value = cfg.rateLimitCount || 5;
+    document.getElementById('cfg-nonadmin-decorations').checked = cfg.allowNonAdminDecorations !== false;
+    document.getElementById('cfg-rate-count').value = cfg.rateLimitCount || 15;
     document.getElementById('cfg-rate-window').value = cfg.rateLimitWindowSec || 10;
 
     document.getElementById('cfg-welcome-enabled').checked = cfg.autoWelcomeEnabled !== false;
@@ -348,6 +532,20 @@ async function loadAdminPanel() {
     document.getElementById('cfg-changelog-ver').value = cfg.changelogVersion || '';
     document.getElementById('cfg-changelog-text').value = cfg.changelogText || '';
     document.getElementById('cfg-tos-text').value = cfg.tosText || '';
+
+    // Render Avatar Decorations in Admin Studio
+    const decList = document.getElementById('admin-decoration-list');
+    decList.innerHTML = '';
+    (cfg.avatarDecorations || []).forEach(dec => {
+        decList.innerHTML += `<div class="decoration-card">
+            <button class="del-dec" onclick="deleteAvatarDecoration('${dec._id}')" title="Delete">✕</button>
+            <div class="avatar-wrapper" style="width:44px;height:44px;">
+                <img src="${currentUser.pfp}" class="avatar" style="width:44px;height:44px;">
+                <img src="${dec.image}" class="avatar-decoration">
+            </div>
+            <span>${dec.name}</span>
+        </div>`;
+    });
 
     // Badge Studio List
     const bList = document.getElementById('badge-studio-list');
@@ -366,7 +564,7 @@ async function loadAdminPanel() {
         chSelect.innerHTML += `<option value="${c._id}">[${srvName}] #${c.name}</option>`;
     });
 
-    // 4. Load Tickets
+    // Tickets
     const tRes = await fetch(`${API_URL}/admin/tickets`);
     const tickets = await tRes.json();
     const tContainer = document.getElementById('admin-tickets-list');
@@ -386,7 +584,7 @@ async function loadAdminPanel() {
         </div>`;
     });
 
-    // 5. Load Audit Logs
+    // Audit Logs
     const aRes = await fetch(`${API_URL}/admin/audit-logs`);
     const logs = await aRes.json();
     const aContainer = document.getElementById('admin-audit-list');
@@ -397,6 +595,38 @@ async function loadAdminPanel() {
             <span style="font-size:11px; color:#72767d;">${new Date(l.timestamp).toLocaleString()}</span>
         </div>`;
     });
+}
+
+// --- ADMIN AVATAR DECORATION STUDIO ACTIONS ---
+async function uploadAvatarDecoration() {
+    const name = document.getElementById('new-decoration-name').value.trim();
+    const file = document.getElementById('new-decoration-file').files[0];
+    if (!name || !file) return alert("Enter a decoration name and select an image file.");
+
+    const image = await toBase64(file);
+    await fetch(`${API_URL}/admin/decorations`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, image, adminName: currentUser.username })
+    });
+    document.getElementById('new-decoration-name').value = '';
+    document.getElementById('new-decoration-file').value = '';
+    loadAdminPanel();
+}
+
+async function deleteAvatarDecoration(decId) {
+    await fetch(`${API_URL}/admin/decorations/${decId}?adminName=${encodeURIComponent(currentUser.username)}`, { method: 'DELETE' });
+    loadAdminPanel();
+}
+
+async function toggleNonAdminDecorations() {
+    const allowNonAdminDecorations = document.getElementById('cfg-nonadmin-decorations').checked;
+    await fetch(`${API_URL}/admin/config`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowNonAdminDecorations, adminName: currentUser.username })
+    });
+    globalConfig.allowNonAdminDecorations = allowNonAdminDecorations;
+    lastRenderedHash = "";
+    loadMessages(false);
 }
 
 // --- ADMIN USER MODAL ACTIONS ---
@@ -413,14 +643,12 @@ async function openAdminUserModal(userId) {
 
     renderAdminUserBadges();
 
-    // Populate Badge Dropdown
     const bSelect = document.getElementById('adm-u-badge-select');
     bSelect.innerHTML = '';
     (globalConfig.customBadges || []).forEach(b => {
         bSelect.innerHTML += `<option value="${b.name}">${b.icon} ${b.name}</option>`;
     });
 
-    // Load User's Servers
     const sRes = await fetch(`${API_URL}/admin/users/${userId}/servers`);
     const servers = await sRes.json();
     const sList = document.getElementById('adm-u-servers');
@@ -693,6 +921,15 @@ window.showUserProfile = function(event, userId) {
     document.getElementById('view-username').innerHTML = `${user.username}<span id="view-disc">#${user.discriminator}</span> ${user.isVerified ? verifiedSVG : ''}`;
     document.getElementById('view-pfp').src = user.pfp;
 
+    const viewDec = document.getElementById('view-decoration');
+    const effDec = getEffectiveDecoration(user);
+    if (effDec) {
+        viewDec.src = effDec;
+        viewDec.classList.remove('hidden');
+    } else {
+        viewDec.classList.add('hidden');
+    }
+
     let statusText = user.customStatus || user.activity.charAt(0).toUpperCase() + user.activity.slice(1);
     document.getElementById('view-status').innerText = statusText;
     document.getElementById('view-activity-dot').className = `status-dot large ${user.activity}`;
@@ -709,6 +946,17 @@ window.showUserProfile = function(event, userId) {
         });
     }
 
+    // Server Roles inside Profile Popout
+    const rolesSection = document.getElementById('view-roles-section');
+    const rolesContainer = document.getElementById('view-roles');
+    const userRoles = getUserServerRoles(userId);
+    if (activeServer && userRoles.length > 0) {
+        rolesSection.classList.remove('hidden');
+        rolesContainer.innerHTML = userRoles.map(r => `<span class="badge" style="background:#202225; border:1px solid ${r.color};"><span class="role-dot" style="background:${r.color};"></span>${r.name}</span>`).join('');
+    } else {
+        rolesSection.classList.add('hidden');
+    }
+
     const bannerEl = document.getElementById('view-banner');
     if (user.banner && (user.banner.startsWith('data:') || user.banner.startsWith('http'))) {
         bannerEl.style.backgroundImage = `url(${user.banner})`; bannerEl.style.backgroundColor = 'transparent';
@@ -722,7 +970,7 @@ window.showUserProfile = function(event, userId) {
     let x = event.clientX + 10;
     let y = event.clientY + 10;
     if (x + 300 > window.innerWidth) x = window.innerWidth - 320;
-    if (y + 400 > window.innerHeight) y = window.innerHeight - 420;
+    if (y + 420 > window.innerHeight) y = window.innerHeight - 440;
 
     modal.style.left = x + 'px';
     modal.style.top = y + 'px';
@@ -748,6 +996,8 @@ document.addEventListener('click', (e) => {
 // --- NAVIGATION ---
 async function goHome() {
     activeServer = null;
+    window.currentServerRoles = [];
+    window.currentServerMemberRoles = [];
     document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
     document.querySelector('.home-icon').classList.add('active');
     document.getElementById('sidebar-title').innerText = "Direct Messages";
@@ -768,8 +1018,10 @@ async function goHome() {
         window.userCache[f._id] = f;
         const dm = data.dms.find(d => d.participants.includes(f._id));
         if (!dm) return;
+        const effDec = getEffectiveDecoration(f);
+        const decHtml = effDec ? `<img src="${effDec}" class="avatar-decoration">` : '';
         const div = document.createElement('div'); div.className = 'list-item';
-        div.innerHTML = `<div class="avatar-wrapper"><img src="${f.pfp}" class="avatar" style="width:24px;height:24px;"><div class="status-dot ${f.activity}" style="width:8px;height:8px;bottom:0;right:0;"></div></div> ${f.username} ${f.isVerified ? verifiedSVG : ''}`;
+        div.innerHTML = `<div class="avatar-wrapper"><img src="${f.pfp}" class="avatar" style="width:24px;height:24px;">${decHtml}<div class="status-dot ${f.activity}" style="width:8px;height:8px;bottom:0;right:0;"></div></div> ${f.username} ${f.isVerified ? verifiedSVG : ''}`;
         div.onclick = (e) => {
             document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
             e.currentTarget.classList.add('active'); selectChat(dm._id, `@${f.username}`);
@@ -814,8 +1066,8 @@ async function selectServer(server) {
     document.getElementById('server-settings-btn').classList.toggle('hidden', !isOwner && !isSysAdmin);
     document.getElementById('member-list').classList.remove('hidden');
 
+    await loadMembers(server._id);
     loadChannels(server._id);
-    loadMembers(server._id);
 }
 
 // RIGHT CLICK CONTEXT MENU
@@ -879,19 +1131,57 @@ async function loadChannels(serverId) {
 
 async function loadMembers(serverId) {
     const res = await fetch(`${API_URL}/servers/${serverId}/members`);
-    const members = await res.json();
-    window.currentServerMembers = members;
-    const container = document.getElementById('members-container'); container.innerHTML = '';
-    members.forEach(m => {
+    const data = await res.json();
+    window.currentServerMembers = data.members || [];
+    window.currentServerRoles = data.roles || [];
+    window.currentServerMemberRoles = data.memberRoles || [];
+
+    const container = document.getElementById('members-container');
+    container.innerHTML = '';
+
+    // Group members by their primary role
+    const grouped = {};
+    const noRoleMembers = [];
+
+    window.currentServerMembers.forEach(m => {
         window.userCache[m._id] = m;
-        const div = document.createElement('div'); div.className = 'member-item';
-        div.innerHTML = `<div class="avatar-wrapper"><img src="${m.pfp}" class="avatar" style="width:28px;height:28px;"><div class="status-dot ${m.activity}" style="width:10px;height:10px;"></div></div> <span class="username">${m.username}</span>`;
-        div.onclick = (e) => showUserProfile(e, m._id);
-        container.appendChild(div);
+        const roles = getUserServerRoles(m._id);
+        if (roles.length > 0) {
+            const topRole = roles[0];
+            if (!grouped[topRole._id]) grouped[topRole._id] = { role: topRole, members: [] };
+            grouped[topRole._id].members.push({ member: m, topRole });
+        } else {
+            noRoleMembers.push({ member: m, topRole: null });
+        }
     });
+
+    const renderMemberGroup = (title, color, list) => {
+        if (!list.length) return;
+        const header = document.createElement('h3');
+        header.className = 'member-role';
+        if (color) header.style.color = color;
+        header.innerText = `${title} — ${list.length}`;
+        container.appendChild(header);
+
+        list.forEach(({ member: m, topRole }) => {
+            const effDec = getEffectiveDecoration(m);
+            const decHtml = effDec ? `<img src="${effDec}" class="avatar-decoration">` : '';
+            const nameColor = topRole ? `style="color:${topRole.color};"` : '';
+            const div = document.createElement('div');
+            div.className = 'member-item';
+            div.innerHTML = `<div class="avatar-wrapper"><img src="${m.pfp}" class="avatar" style="width:28px;height:28px;">${decHtml}<div class="status-dot ${m.activity}" style="width:10px;height:10px;"></div></div> <span class="username" ${nameColor}>${m.username}</span>`;
+            div.onclick = (e) => showUserProfile(e, m._id);
+            container.appendChild(div);
+        });
+    };
+
+    window.currentServerRoles.forEach(r => {
+        if (grouped[r._id]) renderMemberGroup(r.name, r.color, grouped[r._id].members);
+    });
+    renderMemberGroup('Members', null, noRoleMembers);
 }
 
-// --- MESSAGES ---
+// --- MESSAGES (ZERO-DELAY OPTIMISTIC UI + 500MS FAST SYNC) ---
 function selectChat(targetId, chatName, topic = "") {
     if (currentTargetId === targetId) return;
 
@@ -914,7 +1204,7 @@ function selectChat(targetId, chatName, topic = "") {
 
     if (messageInterval) clearInterval(messageInterval);
     loadMessages(true);
-    messageInterval = setInterval(() => loadMessages(false), 2000);
+    messageInterval = setInterval(() => loadMessages(false), 500);
 }
 
 function initReply(msgId, username) {
@@ -935,6 +1225,63 @@ async function editMsg(id) {
     }
 }
 
+function buildMessageElement(msg, isOptimistic = false) {
+    const author = msg.authorId;
+    const time = new Date(msg.timestamp || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    let safeContent = msg.content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    if (globalConfig.allowMentions !== false) {
+        safeContent = safeContent.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+    }
+
+    const div = document.createElement('div');
+    div.className = 'message-wrapper';
+    if (isOptimistic) div.style.opacity = '0.85';
+
+    let replyHtml = '';
+    if (msg.replyTo && msg.replyTo.authorId) {
+        replyHtml = `<div class="reply-context"><img src="${msg.replyTo.authorId.pfp || ''}" style="width:16px;height:16px;border-radius:50%;"><span class="rep-user">@${msg.replyTo.authorId.username}</span> ${msg.replyTo.content.substring(0, 40)}...</div>`;
+    }
+
+    let actionHtml = '';
+    if (!realAdminUser && !isOptimistic) {
+        actionHtml = `<div class="message-actions"><button onclick="initReply('${msg._id}', '${author.username}')" title="Reply"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></button>`;
+        if (author._id.toString() === currentUser._id.toString() || currentUser.isAdmin) {
+            actionHtml += `<button onclick="editMsg('${msg._id}')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
+                           <button class="del" onclick="deleteMsg('${msg._id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
+        }
+        actionHtml += `</div>`;
+    }
+
+    const sysBadge = msg.isSystem ? `<span class="system-tag">SYSTEM</span>` : '';
+    const effDec = getEffectiveDecoration(author);
+    const decHtml = effDec ? `<img src="${effDec}" class="avatar-decoration">` : '';
+
+    // Role color on username
+    const userRoles = getUserServerRoles(author._id);
+    const nameColor = userRoles.length > 0 ? `style="color:${userRoles[0].color};"` : '';
+
+    div.innerHTML = `
+        ${replyHtml}
+        <div class="message ${msg.isSystem ? 'system-msg' : ''}">
+            <div class="avatar-wrapper" style="width:40px;height:40px;" onclick="showUserProfile(event, '${author._id}')">
+                <img src="${author.pfp}" class="avatar">
+                ${decHtml}
+            </div>
+            <div style="flex:1;">
+                <div class="message-header">
+                    <span class="username" ${nameColor} onclick="showUserProfile(event, '${author._id}')">${author.username} ${author.isVerified ? verifiedSVG : ''}</span>
+                    ${sysBadge}
+                    <span class="timestamp">${time}</span>
+                </div>
+                <div class="text">${safeContent} ${msg.isEdited ? '<span class="is-edited">(edited)</span>' : ''}</div>
+            </div>
+            ${actionHtml}
+        </div>
+    `;
+    return div;
+}
+
 async function loadMessages(forceScroll = false) {
     if (!currentTargetId) return;
     const requestedTargetId = currentTargetId;
@@ -946,7 +1293,7 @@ async function loadMessages(forceScroll = false) {
 
         if (currentTargetId !== requestedTargetId) return;
 
-        const currentHash = `${requestedTargetId}:` + messages.map(m => `${m._id}-${m.content}-${m.isEdited}`).join('|');
+        const currentHash = `${requestedTargetId}:` + messages.map(m => `${m._id}-${m.content}-${m.isEdited}-${m.authorId?.avatarDecoration || ''}`).join('|');
         if (!forceScroll && currentHash === lastRenderedHash) return;
         lastRenderedHash = currentHash;
 
@@ -957,48 +1304,7 @@ async function loadMessages(forceScroll = false) {
         messages.forEach(msg => {
             if (!msg.authorId) return;
             window.userCache[msg.authorId._id] = msg.authorId;
-            const time = new Date(msg.timestamp).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-            let safeContent = msg.content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            if (globalConfig.allowMentions !== false) {
-                safeContent = safeContent.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
-            }
-
-            const div = document.createElement('div'); div.className = 'message-wrapper';
-
-            let replyHtml = '';
-            if (msg.replyTo && msg.replyTo.authorId) {
-                replyHtml = `<div class="reply-context"><img src="${msg.replyTo.authorId.pfp || ''}" style="width:16px;height:16px;border-radius:50%;"><span class="rep-user">@${msg.replyTo.authorId.username}</span> ${msg.replyTo.content.substring(0, 40)}...</div>`;
-            }
-
-            let actionHtml = '';
-            if (!realAdminUser) {
-                actionHtml = `<div class="message-actions"><button onclick="initReply('${msg._id}', '${msg.authorId.username}')" title="Reply"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></button>`;
-                if (msg.authorId._id.toString() === currentUser._id.toString() || currentUser.isAdmin) {
-                    actionHtml += `<button onclick="editMsg('${msg._id}')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
-                                   <button class="del" onclick="deleteMsg('${msg._id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
-                }
-                actionHtml += `</div>`;
-            }
-
-            const sysBadge = msg.isSystem ? `<span class="system-tag">SYSTEM</span>` : '';
-
-            div.innerHTML = `
-                ${replyHtml}
-                <div class="message ${msg.isSystem ? 'system-msg' : ''}">
-                    <img src="${msg.authorId.pfp}" class="avatar" onclick="showUserProfile(event, '${msg.authorId._id}')">
-                    <div style="flex:1;">
-                        <div class="message-header">
-                            <span class="username" onclick="showUserProfile(event, '${msg.authorId._id}')">${msg.authorId.username} ${msg.authorId.isVerified ? verifiedSVG : ''}</span>
-                            ${sysBadge}
-                            <span class="timestamp">${time}</span>
-                        </div>
-                        <div class="text">${safeContent} ${msg.isEdited ? '<span class="is-edited">(edited)</span>' : ''}</div>
-                    </div>
-                    ${actionHtml}
-                </div>
-            `;
-            container.appendChild(div);
+            container.appendChild(buildMessageElement(msg, false));
         });
         if (isAtBottom || forceScroll) container.scrollTop = container.scrollHeight;
     } catch (err) {
@@ -1049,18 +1355,44 @@ window.insertMention = function(username) {
     input.focus();
 }
 
+// INSTANT ZERO-DELAY MESSAGE SEND
 document.getElementById('message-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (realAdminUser) return;
     const input = document.getElementById('message-input');
-    if (!input.value.trim() || !currentTargetId) return;
-    const content = input.value; input.value = '';
-    const res = await fetch(`${API_URL}/messages/${currentTargetId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content, userId: currentUser._id, replyTo: replyingToId }) });
+    const content = input.value;
+    if (!content.trim() || !currentTargetId) return;
+
+    const target = currentTargetId;
+    const replyId = replyingToId;
+    input.value = '';
+    cancelReply();
+
+    // 1. Render immediately in DOM (0ms delay)
+    const container = document.getElementById('messages-container');
+    if (container.innerText === 'Loading messages...') container.innerHTML = '';
+    const optimisticEl = buildMessageElement({
+        content,
+        authorId: currentUser,
+        timestamp: new Date()
+    }, true);
+    container.appendChild(optimisticEl);
+    container.scrollTop = container.scrollHeight;
+
+    // 2. Persist in background
+    const res = await fetch(`${API_URL}/messages/${target}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, userId: currentUser._id, replyTo: replyId })
+    });
+
     if (!res.ok) {
+        optimisticEl.remove();
         const err = await res.json();
         alert(err.error || "Failed to send message.");
+    } else {
+        loadMessages(true);
     }
-    cancelReply(); loadMessages(true);
 });
 
 // Modals
