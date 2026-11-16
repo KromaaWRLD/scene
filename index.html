@@ -7,6 +7,12 @@
     <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
 </head>
 <body>
+    <!-- IMPERSONATION BANNER -->
+    <div id="impersonation-banner" class="hidden">
+        <span>👁️ READ-ONLY IMPERSONATION MODE: Viewing Scene as <b id="impersonating-name">User</b></span>
+        <button onclick="stopImpersonation()">Exit Preview</button>
+    </div>
+
     <div id="auth-screen" class="screen">
         <div class="auth-box" id="login-box">
             <h2>Welcome Back</h2>
@@ -114,8 +120,8 @@
         <div class="settings-sidebar">
             <h4 id="settings-header">SETTINGS</h4>
             <div class="settings-tab active" id="tab-my-account" onclick="showSettingsPane('settings-user-panel', this)">My Account</div>
+            <div class="settings-tab" id="tab-support" onclick="showSettingsPane('settings-support-panel', this)">Support & Rules</div>
             <div class="settings-tab" id="tab-admin" onclick="showSettingsPane('settings-admin-panel', this)" style="display:none; color:#faa61a;">Admin Panel</div>
-            
             <div class="settings-tab" id="tab-server" onclick="showSettingsPane('settings-server-panel', this)" style="display:none;">Server Overview</div>
             
             <div class="divider" style="margin: 8px 0;"></div>
@@ -124,6 +130,7 @@
         <div class="settings-content">
             <button class="close-settings" onclick="closeSettings()">✕</button>
             
+            <!-- USER ACCOUNT PANE -->
             <div id="settings-user-panel" class="settings-pane">
                 <h2>My Account</h2>
                 <div class="profile-card">
@@ -149,6 +156,23 @@
                 <button class="save-btn" onclick="saveProfile()">Save Changes</button>
             </div>
 
+            <!-- USER SUPPORT & TOS PANE -->
+            <div id="settings-support-panel" class="settings-pane hidden">
+                <h2>Terms of Service & Rules</h2>
+                <div id="user-tos-display" class="tos-box"></div>
+                
+                <h2 style="margin-top:20px;">Submit Support Ticket / Bug Report</h2>
+                <label>Subject</label>
+                <input type="text" id="ticket-subject" placeholder="Bug report, account help, etc.">
+                <label>Description</label>
+                <textarea id="ticket-message" rows="3" placeholder="Describe your issue..."></textarea>
+                <button class="save-btn" onclick="submitTicket()">Submit Ticket</button>
+
+                <label style="margin-top:20px;">My Previous Tickets</label>
+                <div id="user-tickets-list" class="admin-list"></div>
+            </div>
+
+            <!-- SERVER OVERVIEW PANE -->
             <div id="settings-server-panel" class="settings-pane hidden">
                 <h2>Server Overview</h2>
                 <label>Server Name</label>
@@ -159,23 +183,109 @@
                     <button onclick="copyInvite()">Copy</button>
                 </div>
                 <button class="save-btn" onclick="saveServer()">Save Changes</button>
-                
                 <div class="divider" style="margin: 20px 0; background:#4f545c;"></div>
-                
                 <h3 style="color:white; margin-bottom:8px;">Channel Management</h3>
                 <button class="save-btn" style="background:#5865F2; margin-top:0;" onclick="closeSettings(); showModal('channel-modal');">Create New Channel</button>
-
                 <div class="divider" style="margin: 20px 0; background:#4f545c;"></div>
                 <button class="save-btn danger" onclick="deleteServer()">Delete Server</button>
             </div>
 
-            <div id="settings-admin-panel" class="settings-pane hidden">
+            <!-- EXPANDED SYSTEM ADMIN PANEL -->
+            <div id="settings-admin-panel" class="settings-pane hidden" style="max-width: 850px;">
                 <h2 style="color:#faa61a;">System Admin Dashboard</h2>
-                <label>All Users</label>
-                <div id="admin-user-list" class="admin-list"></div>
                 
-                <label style="margin-top:16px;">All Servers</label>
-                <div id="admin-server-list" class="admin-list"></div>
+                <!-- Sub-Navigation Tabs -->
+                <div class="admin-subtabs">
+                    <button class="admin-subtab active" onclick="switchAdminSubtab('adm-users', this)">Users & Mod</button>
+                    <button class="admin-subtab" onclick="switchAdminSubtab('adm-servers', this)">Servers & Channels</button>
+                    <button class="admin-subtab" onclick="switchAdminSubtab('adm-messages', this)">Messages & System</button>
+                    <button class="admin-subtab" onclick="switchAdminSubtab('adm-community', this)">Badges, Tickets & Rules</button>
+                    <button class="admin-subtab" onclick="switchAdminSubtab('adm-audit', this)">Audit Logs</button>
+                </div>
+
+                <!-- 1. USERS & MODERATION -->
+                <div id="adm-users" class="admin-subpane">
+                    <label>All Registered Users</label>
+                    <div id="admin-user-list" class="admin-list" style="max-height: 450px;"></div>
+                </div>
+
+                <!-- 2. SERVERS & CHANNELS OVERSIGHT -->
+                <div id="adm-servers" class="admin-subpane hidden">
+                    <label>All Servers (Members, Quarantine, Channel Limits, Vanity Invites)</label>
+                    <div id="admin-server-list" class="admin-list" style="max-height: 450px;"></div>
+                </div>
+
+                <!-- 3. MESSAGES, SYSTEM CONTROLS & SECURITY -->
+                <div id="adm-messages" class="admin-subpane hidden">
+                    <div class="admin-card">
+                        <h3>System Controls & Security</h3>
+                        <label class="checkbox-row"><input type="checkbox" id="cfg-maintenance"> <span>Enable Maintenance Mode (Locks out non-admins)</span></label>
+                        <label class="checkbox-row"><input type="checkbox" id="cfg-emojis"> <span>Allow Emojis Globally</span></label>
+                        <label class="checkbox-row"><input type="checkbox" id="cfg-mentions"> <span>Allow @Mentions Globally</span></label>
+                        
+                        <div style="display:flex; gap:12px; margin-top:10px;">
+                            <div style="flex:1;">
+                                <label>Rate Limit: Max Messages</label>
+                                <input type="number" id="cfg-rate-count" min="1" max="100">
+                            </div>
+                            <div style="flex:1;">
+                                <label>Rate Limit: Per Seconds</label>
+                                <input type="number" id="cfg-rate-window" min="1" max="300">
+                            </div>
+                        </div>
+                        <button class="save-btn" onclick="saveSystemConfig()">Save System & Security Settings</button>
+                    </div>
+
+                    <div class="admin-card" style="margin-top:16px;">
+                        <h3>Send Official "Scene" SYSTEM Message</h3>
+                        <label>Target Channel</label>
+                        <select id="sys-msg-channel"></select>
+                        <label>System Announcement Content</label>
+                        <input type="text" id="sys-msg-content" placeholder="Type official system message...">
+                        <button class="save-btn" style="background:#5865F2;" onclick="sendSystemMessage()">Broadcast System Message</button>
+                    </div>
+                </div>
+
+                <!-- 4. COMMUNITY, BADGES, TICKETS & CHANGELOG -->
+                <div id="adm-community" class="admin-subpane hidden">
+                    <div class="admin-card">
+                        <h3>Badge Creator Studio</h3>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="new-badge-name" placeholder="Badge Name (e.g. VIP)">
+                            <input type="text" id="new-badge-icon" placeholder="Icon (e.g. 💎)" style="width:90px;">
+                            <input type="color" id="new-badge-color" value="#5865F2" style="width:50px; height:38px; border:none; background:none;">
+                            <button class="save-btn" style="margin-top:0;" onclick="createCustomBadge()">Create</button>
+                        </div>
+                        <div id="badge-studio-list" class="badges-container" style="margin-top:10px;"></div>
+                    </div>
+
+                    <div class="admin-card" style="margin-top:16px;">
+                        <h3>Auto-Welcome DM, Changelog & Rules Editor</h3>
+                        <label class="checkbox-row"><input type="checkbox" id="cfg-welcome-enabled"> <span>Send Auto-Welcome DM from Official Scene Bot on Signup</span></label>
+                        <input type="text" id="cfg-welcome-msg" placeholder="Welcome message text...">
+                        
+                        <label>Changelog Version & "What's New" Popup</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="cfg-changelog-ver" placeholder="v1.1" style="width:100px;">
+                            <input type="text" id="cfg-changelog-text" placeholder="What's new in this update...">
+                        </div>
+
+                        <label>Terms of Service & Rules</label>
+                        <textarea id="cfg-tos-text" rows="3"></textarea>
+                        <button class="save-btn" onclick="saveCommunityConfig()">Save Community Settings</button>
+                    </div>
+
+                    <div class="admin-card" style="margin-top:16px;">
+                        <h3>Support Tickets & Bug Reports</h3>
+                        <div id="admin-tickets-list" class="admin-list"></div>
+                    </div>
+                </div>
+
+                <!-- 5. ADMIN AUDIT LOGS -->
+                <div id="adm-audit" class="admin-subpane hidden">
+                    <label>Admin Action Audit Log (Last 100 Actions)</label>
+                    <div id="admin-audit-list" class="admin-list" style="max-height: 450px;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -200,7 +310,112 @@
         </div>
     </div>
 
-    <!-- MODALS -->
+    <!-- ADMIN INSPECT USER MODAL -->
+    <div id="admin-user-modal" class="modal hidden">
+        <div class="modal-content" style="width: 480px; max-height: 90vh; overflow-y: auto;">
+            <h3 id="adm-u-title">Manage User</h3>
+            <div id="adm-u-dates" style="font-size:12px; color:#b9bbbe;"></div>
+            
+            <label style="font-size:12px; color:#b9bbbe;">Edit Username & Tag</label>
+            <div style="display:flex; gap:6px;">
+                <input type="text" id="adm-u-name" placeholder="Username" style="flex:2;">
+                <input type="text" id="adm-u-disc" placeholder="0000" style="flex:1;">
+                <button onclick="admSaveIdentity()">Save</button>
+            </div>
+
+            <label style="font-size:12px; color:#b9bbbe;">Force Password Reset</label>
+            <div style="display:flex; gap:6px;">
+                <input type="text" id="adm-u-pass" placeholder="New password...">
+                <button onclick="admResetPassword()">Set</button>
+            </div>
+
+            <label style="font-size:12px; color:#b9bbbe;">Temporary Suspension</label>
+            <div style="display:flex; gap:6px;">
+                <select id="adm-u-suspend-hours" style="flex:1; background:#202225; color:white; border:none; padding:10px; border-radius:4px;">
+                    <option value="1">1 Hour</option>
+                    <option value="24">24 Hours</option>
+                    <option value="168">7 Days</option>
+                    <option value="0">Lift Suspension</option>
+                </select>
+                <button class="danger" onclick="admSuspendUser()">Apply</button>
+            </div>
+
+            <label style="font-size:12px; color:#b9bbbe;">Send Live System Warning Popup</label>
+            <div style="display:flex; gap:6px;">
+                <input type="text" id="adm-u-warn" placeholder="Warning message...">
+                <button style="background:#faa61a; color:black;" onclick="admWarnUser()">Warn</button>
+            </div>
+
+            <label style="font-size:12px; color:#b9bbbe;">Profile Resets</label>
+            <div style="display:flex; gap:6px;">
+                <button style="flex:1; background:#4f545c;" onclick="admResetProfile('pfp')">Reset PFP</button>
+                <button style="flex:1; background:#4f545c;" onclick="admResetProfile('bio')">Wipe Bio</button>
+                <button style="flex:1; background:#4f545c;" onclick="admResetProfile('banner')">Reset Banner</button>
+            </div>
+
+            <label style="font-size:12px; color:#b9bbbe;">Badges</label>
+            <div id="adm-u-badges" class="badges-container"></div>
+            <div style="display:flex; gap:6px;">
+                <select id="adm-u-badge-select" style="flex:1; background:#202225; color:white; border:none; padding:10px; border-radius:4px;"></select>
+                <button style="background:#43b581;" onclick="admManageBadge('add')">Give</button>
+                <button class="danger" onclick="admManageBadge('remove')">Remove</button>
+            </div>
+
+            <label style="font-size:12px; color:#b9bbbe;">Servers User Is In</label>
+            <div id="adm-u-servers" class="admin-list" style="max-height:100px;"></div>
+
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <button style="flex:1; background:#5865F2;" onclick="admStartImpersonation()">Impersonate (Read-Only)</button>
+                <button style="flex:1;" class="danger" onclick="hideModal('admin-user-modal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN INSPECT SERVER MODAL -->
+    <div id="admin-server-modal" class="modal hidden">
+        <div class="modal-content" style="width: 480px; max-height: 90vh; overflow-y: auto;">
+            <h3 id="adm-s-title">Manage Server</h3>
+            
+            <label style="font-size:12px; color:#b9bbbe;">Server Name</label>
+            <input type="text" id="adm-s-name">
+
+            <label style="font-size:12px; color:#b9bbbe;">Invite Code / Custom Vanity Code</label>
+            <div style="display:flex; gap:6px;">
+                <input type="text" id="adm-s-invite">
+                <button style="background:#4f545c;" onclick="admRegenInvite()">Randomize</button>
+            </div>
+
+            <label style="font-size:12px; color:#b9bbbe;">Max Channel Creation Limit</label>
+            <input type="number" id="adm-s-maxch" min="1" max="500">
+
+            <label class="checkbox-row"><input type="checkbox" id="adm-s-quarantine"> <span>Quarantine Server (Freeze all messaging)</span></label>
+
+            <button style="background:#43b581;" onclick="admSaveServer()">Save Server Changes</button>
+
+            <label style="font-size:12px; color:#b9bbbe; margin-top:8px;">Locked Channels & Allowlist</label>
+            <div id="adm-s-locked-list" class="admin-list" style="max-height:160px;"></div>
+
+            <button class="danger" onclick="hideModal('admin-server-modal')">Close</button>
+        </div>
+    </div>
+
+    <!-- SYSTEM WARNING / CHANGELOG / INVITE MODALS -->
+    <div id="system-warning-modal" class="modal hidden" style="z-index: 5000;">
+        <div class="modal-content" style="border: 2px solid #faa61a; text-align:center;">
+            <h3 style="color:#faa61a;">⚠️ Official System Warning</h3>
+            <p id="system-warning-text" style="font-size:15px; color:white;"></p>
+            <button style="background:#faa61a; color:black;" onclick="hideModal('system-warning-modal')">Acknowledge</button>
+        </div>
+    </div>
+
+    <div id="changelog-modal" class="modal hidden" style="z-index: 4500;">
+        <div class="modal-content" style="border: 2px solid #5865F2;">
+            <h3 id="changelog-modal-title">What's New in Scene</h3>
+            <p id="changelog-modal-body" style="font-size:14px; color:#dcddde; white-space:pre-line;"></p>
+            <button onclick="dismissChangelog()">Got it!</button>
+        </div>
+    </div>
+
     <div id="invite-prompt-modal" class="modal hidden">
         <div class="modal-content" style="text-align: center;">
             <h3>You've been invited!</h3>
