@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '15mb' }));
 app.use(express.static(__dirname));
 
 const mongoURI = "mongodb+srv://27johnballenger2_db_user:hm398KIfJh0lX98E@cluster0.nkbek9a.mongodb.net/scene_db?retryWrites=true&w=majority";
@@ -17,6 +17,7 @@ const User = mongoose.model('User', new mongoose.Schema({
     discriminator: { type: String, required: true },
     password: { type: String, required: true },
     pfp: { type: String, default: 'https://ui-avatars.com/api/?name=U&background=5865F2&color=fff' },
+    avatarDecoration: { type: String, default: '' },
     banner: { type: String, default: '#36393f' },
     bio: { type: String, default: "I'm new to Scene!" },
     activity: { type: String, default: 'online' },
@@ -40,7 +41,15 @@ const Server = mongoose.model('Server', new mongoose.Schema({
     inviteCode: { type: String, unique: true },
     isVerified: { type: Boolean, default: false },
     isQuarantined: { type: Boolean, default: false },
-    maxChannels: { type: Number, default: 50 }
+    maxChannels: { type: Number, default: 50 },
+    roles: [{
+        name: { type: String, required: true },
+        color: { type: String, default: '#99aab5' }
+    }],
+    memberRoles: [{
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        roleIds: [String]
+    }]
 }));
 
 const Channel = mongoose.model('Channel', new mongoose.Schema({
@@ -70,7 +79,9 @@ const SystemConfig = mongoose.model('SystemConfig', new mongoose.Schema({
     maintenanceMode: { type: Boolean, default: false },
     allowEmojis: { type: Boolean, default: true },
     allowMentions: { type: Boolean, default: true },
-    rateLimitCount: { type: Number, default: 5 },
+    allowNonAdminDecorations: { type: Boolean, default: true },
+    avatarDecorations: [{ name: String, image: String }],
+    rateLimitCount: { type: Number, default: 15 },
     rateLimitWindowSec: { type: Number, default: 10 },
     changelogText: { type: String, default: 'Welcome to Scene! Check out our latest updates.' },
     changelogVersion: { type: String, default: 'v1.0' },
@@ -130,7 +141,6 @@ async function logAdmin(adminName, action, target) {
     await new AuditLog({ adminName: adminName || 'Admin', action, target }).save();
 }
 
-// In-memory rate limit tracker
 const userMessageTimestamps = {};
 
 // --- PUBLIC CONFIG & HEARTBEAT ---
@@ -143,7 +153,13 @@ app.post('/api/heartbeat/:userId', async (req, res) => {
     const user = await User.findByIdAndUpdate(req.params.userId, { lastActive: new Date() }, { new: true });
     const cfg = await SystemConfig.findOne({ key: 'global' });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    
+
+    // Strip decoration if non-admin decorations were disabled by admins
+    if (cfg && cfg.allowNonAdminDecorations === false && !user.isAdmin && user.avatarDecoration) {
+        user.avatarDecoration = '';
+        await user.save();
+    }
+
     const warning = user.pendingWarning;
     if (warning) {
         user.pendingWarning = '';
@@ -174,7 +190,6 @@ app.post('/api/register', async (req, res) => {
     const user = new User({ username, discriminator, password: hashedPassword, pfp, isAdmin });
     await user.save();
 
-    // Auto-Welcome DM from Official Scene Bot
     if (cfg && cfg.autoWelcomeEnabled) {
         const bot = await User.findOne({ username: 'Scene', discriminator: '0000' });
         if (bot) {
@@ -219,13 +234,23 @@ app.post('/api/login', async (req, res) => {
 
 // --- USERS & FRIENDS ---
 app.put('/api/users/:id', async (req, res) => {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const cfg = await SystemConfig.findOne({ key: 'global' });
+    if (req.body.avatarDecoration && cfg && cfg.allowNonAdminDecorations === false && !user.isAdmin) {
+        return res.status(403).json({ error: 'Avatar decorations are currently disabled for non-admins.' });
+    }
+
     res.json(await User.findByIdAndUpdate(req.params.id, req.body, { new: true }));
 });
+
 app.get('/api/users/:id/friends', async (req, res) => {
-    const user = await User.findById(req.params.id).populate('friends', 'username discriminator pfp activity customStatus isVerified badges bio banner');
+    const user = await User.findById(req.params.id).populate('friends', 'username discriminator pfp avatarDecoration activity customStatus isVerified isAdmin badges bio banner');
     const dms = await DM.find({ participants: req.params.id });
     res.json({ friends: user ? user.friends : [], dms });
 });
+
 app.post('/api/friends/add', async (req, res) => {
     const { currentUserId, friendTag } = req.body;
     if (!friendTag.includes('#')) return res.status(400).json({ error: "Need #0000 format" });
@@ -240,7 +265,7 @@ app.post('/api/friends/add', async (req, res) => {
     res.json({ success: true });
 });
 
-// --- SUPPORT TICKETS (USER SIDE) ---
+// --- SUPPORT TICKETS ---
 app.post('/api/tickets', async (req, res) => {
     const ticket = await new Ticket({
         userId: req.body.userId,
@@ -253,10 +278,16 @@ app.get('/api/tickets/user/:userId', async (req, res) => {
     res.json(await Ticket.find({ userId: req.params.userId }).sort({ createdAt: -1 }));
 });
 
-// --- SERVERS & CHANNELS ---
+// --- SERVERS, ROLES & CHANNELS ---
 app.get('/api/servers/user/:userId', async (req, res) => res.json(await Server.find({ members: req.params.userId })));
 app.post('/api/servers', async (req, res) => {
-    const server = new Server({ name: req.body.name, ownerId: req.body.userId, members: [req.body.userId], inviteCode: Math.random().toString(36).substring(2, 8) });
+    const server = new Server({
+        name: req.body.name,
+        ownerId: req.body.userId,
+        members: [req.body.userId],
+        inviteCode: Math.random().toString(36).substring(2, 8),
+        roles: []
+    });
     await server.save();
     await new Channel({ name: 'general', topic: 'General chat', serverId: server._id }).save();
     res.json(server);
@@ -272,6 +303,48 @@ app.post('/api/servers/join/:code', async (req, res) => {
     if (!server) return res.status(404).json({ error: "Invalid code" });
     res.json(server);
 });
+
+// Server Roles Endpoints
+app.post('/api/servers/:serverId/roles', async (req, res) => {
+    const { name, color } = req.body;
+    const server = await Server.findByIdAndUpdate(
+        req.params.serverId,
+        { $push: { roles: { name, color: color || '#99aab5' } } },
+        { new: true }
+    );
+    res.json(server);
+});
+
+app.delete('/api/servers/:serverId/roles/:roleId', async (req, res) => {
+    const server = await Server.findById(req.params.serverId);
+    if (!server) return res.status(404).json({ error: 'Server not found' });
+    server.roles = server.roles.filter(r => r._id.toString() !== req.params.roleId);
+    server.memberRoles.forEach(mr => {
+        mr.roleIds = mr.roleIds.filter(id => id !== req.params.roleId);
+    });
+    await server.save();
+    res.json(server);
+});
+
+app.put('/api/servers/:serverId/members/:userId/roles', async (req, res) => {
+    const { roleId, action } = req.body;
+    const server = await Server.findById(req.params.serverId);
+    if (!server) return res.status(404).json({ error: 'Server not found' });
+
+    let entry = server.memberRoles.find(mr => mr.userId.toString() === req.params.userId);
+    if (!entry) {
+        server.memberRoles.push({ userId: req.params.userId, roleIds: action === 'add' ? [roleId] : [] });
+    } else {
+        if (action === 'add' && !entry.roleIds.includes(roleId)) {
+            entry.roleIds.push(roleId);
+        } else if (action === 'remove') {
+            entry.roleIds = entry.roleIds.filter(id => id !== roleId);
+        }
+    }
+    await server.save();
+    res.json(server);
+});
+
 app.get('/api/servers/:serverId/channels', async (req, res) => res.json(await Channel.find({ serverId: req.params.serverId })));
 app.post('/api/servers/:serverId/channels', async (req, res) => {
     const server = await Server.findById(req.params.serverId);
@@ -291,14 +364,19 @@ app.delete('/api/channels/:id', async (req, res) => {
     res.json({ success: true });
 });
 app.get('/api/servers/:serverId/members', async (req, res) => {
-    const server = await Server.findById(req.params.serverId).populate('members', 'username discriminator pfp banner bio activity customStatus badges isVerified');
-    res.json(server ? server.members : []);
+    const server = await Server.findById(req.params.serverId).populate('members', 'username discriminator pfp avatarDecoration banner bio activity customStatus badges isVerified isAdmin');
+    res.json({
+        members: server ? server.members : [],
+        roles: server ? server.roles : [],
+        memberRoles: server ? server.memberRoles : []
+    });
 });
 
-// --- MESSAGES ---
+// --- MESSAGES (ZERO-DELAY FAST PATH) ---
 app.get('/api/messages/:targetId', async (req, res) => {
     const messages = await Message.find({ targetId: req.params.targetId })
-        .populate('authorId', 'username discriminator pfp banner bio activity customStatus badges isVerified')
+        .sort({ timestamp: 1 })
+        .populate('authorId', 'username discriminator pfp avatarDecoration banner bio activity customStatus badges isVerified isAdmin')
         .populate({ path: 'replyTo', populate: { path: 'authorId', select: 'username pfp' } });
     res.json(messages);
 });
@@ -312,7 +390,6 @@ app.post('/api/messages/:targetId', async (req, res) => {
         return res.status(403).json({ error: 'Your account is temporarily suspended.' });
     }
 
-    // Check Server Quarantine
     const channel = await Channel.findById(req.params.targetId);
     if (channel) {
         const srv = await Server.findById(channel.serverId);
@@ -321,12 +398,11 @@ app.post('/api/messages/:targetId', async (req, res) => {
         }
     }
 
-    // Global Rate Limiting
     const cfg = await SystemConfig.findOne({ key: 'global' });
     if (cfg && !sender.isAdmin) {
         const now = Date.now();
         const windowMs = (cfg.rateLimitWindowSec || 10) * 1000;
-        const maxMsgs = cfg.rateLimitCount || 5;
+        const maxMsgs = cfg.rateLimitCount || 15;
         if (!userMessageTimestamps[userId]) userMessageTimestamps[userId] = [];
         userMessageTimestamps[userId] = userMessageTimestamps[userId].filter(t => now - t < windowMs);
         if (userMessageTimestamps[userId].length >= maxMsgs) {
@@ -342,7 +418,7 @@ app.post('/api/messages/:targetId', async (req, res) => {
 
     const msg = new Message({ content: finalContent, authorId: userId, targetId: req.params.targetId, replyTo });
     await msg.save();
-    res.json(await Message.findById(msg._id).populate('authorId').populate({ path: 'replyTo', populate: { path: 'authorId', select: 'username' } }));
+    res.json({ success: true, _id: msg._id });
 });
 
 app.put('/api/messages/edit/:msgId', async (req, res) => res.json(await Message.findByIdAndUpdate(req.params.msgId, { content: req.body.content, isEdited: true }, { new: true })));
@@ -351,8 +427,6 @@ app.delete('/api/messages/:msgId', async (req, res) => { await Message.findByIdA
 // ==========================================
 // --- EXPANDED ADMIN PANEL ROUTES ---
 // ==========================================
-
-// 1. Users Full Details, Suspend, Password Reset, Identity, Resets, Badges, Servers, Warnings
 app.get('/api/admin/users', async (req, res) => {
     res.json(await User.find({}, '-password').sort({ createdAt: -1 }));
 });
@@ -389,7 +463,7 @@ app.put('/api/admin/users/:id/reset-profile', async (req, res) => {
     const { type, adminName } = req.body;
     const targetUser = await User.findById(req.params.id);
     const updates = {};
-    if (type === 'pfp') updates.pfp = `https://ui-avatars.com/api/?name=${targetUser.username}&background=5865F2&color=fff`;
+    if (type === 'pfp') { updates.pfp = `https://ui-avatars.com/api/?name=${targetUser.username}&background=5865F2&color=fff`; updates.avatarDecoration = ''; }
     if (type === 'bio') { updates.bio = "I'm new to Scene!"; updates.customStatus = ''; }
     if (type === 'banner') updates.banner = '#36393f';
     const u = await User.findByIdAndUpdate(req.params.id, updates, { new: true });
@@ -424,7 +498,7 @@ app.delete('/api/admin/users/:id', async (req, res) => {
     res.json({ success: true });
 });
 
-// 2. Servers Oversight: Member Count, Rename, Invite Regen/Vanity, Quarantine, Channel Limits, Locked Channel Allowlist
+// Servers Oversight
 app.get('/api/admin/servers', async (req, res) => {
     const servers = await Server.find({}).populate('ownerId', 'username discriminator');
     res.json(servers);
@@ -470,7 +544,7 @@ app.put('/api/admin/servers/verify/:id', async (req, res) => {
     res.json(s);
 });
 
-// 3. Official SYSTEM Message Broadcaster
+// Official SYSTEM Message Broadcaster
 app.get('/api/admin/all-channels', async (req, res) => {
     const channels = await Channel.find({}).populate('serverId', 'name');
     res.json(channels);
@@ -492,11 +566,32 @@ app.post('/api/admin/system-message', async (req, res) => {
     res.json(msg);
 });
 
-// 4. System Config, Badge Studio, Audit Logs, Tickets
+// System Config, Avatar Decorations, Badge Studio, Audit Logs, Tickets
 app.put('/api/admin/config', async (req, res) => {
     const { adminName, ...updates } = req.body;
     const cfg = await SystemConfig.findOneAndUpdate({ key: 'global' }, updates, { new: true, upsert: true });
     await logAdmin(adminName, 'Updated global system configuration', 'SystemConfig');
+    res.json(cfg);
+});
+
+app.post('/api/admin/decorations', async (req, res) => {
+    const { name, image, adminName } = req.body;
+    const cfg = await SystemConfig.findOneAndUpdate(
+        { key: 'global' },
+        { $push: { avatarDecorations: { name, image } } },
+        { new: true, upsert: true }
+    );
+    await logAdmin(adminName, `Uploaded avatar decoration "${name}"`, 'Avatar Decorations');
+    res.json(cfg);
+});
+
+app.delete('/api/admin/decorations/:decId', async (req, res) => {
+    const cfg = await SystemConfig.findOneAndUpdate(
+        { key: 'global' },
+        { $pull: { avatarDecorations: { _id: req.params.decId } } },
+        { new: true }
+    );
+    await logAdmin(req.query.adminName, 'Deleted avatar decoration', req.params.decId);
     res.json(cfg);
 });
 
