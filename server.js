@@ -9,10 +9,36 @@ app.use(express.json({ limit: '15mb' }));
 app.use(express.static(__dirname));
 
 const mongoURI = "mongodb+srv://27johnballenger2_db_user:hm398KIfJh0lX98E@cluster0.nkbek9a.mongodb.net/scene_db?retryWrites=true&w=majority";
-mongoose.connect(mongoURI).then(() => console.log('MongoDB Connected')).catch(err => console.log(err));
+
+// --- SERVERLESS-SAFE MONGODB CONNECTION CACHE ---
+let cachedConn = null;
+let systemInitialized = false;
+
+async function connectDB() {
+    if (cachedConn && mongoose.connection.readyState === 1) {
+        return cachedConn;
+    }
+    cachedConn = await mongoose.connect(mongoURI);
+    if (!systemInitialized) {
+        systemInitialized = true;
+        await initSystem();
+    }
+    return cachedConn;
+}
+
+// Ensure DB is connected before any /api route executes
+app.use('/api', async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (err) {
+        console.error('MongoDB connection error:', err);
+        res.status(500).json({ error: 'Database connection failed' });
+    }
+});
 
 // --- SCHEMAS ---
-const User = mongoose.model('User', new mongoose.Schema({
+const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
     username: { type: String, required: true },
     discriminator: { type: String, required: true },
     password: { type: String, required: true },
@@ -33,7 +59,7 @@ const User = mongoose.model('User', new mongoose.Schema({
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }));
 
-const Server = mongoose.model('Server', new mongoose.Schema({
+const Server = mongoose.models.Server || mongoose.model('Server', new mongoose.Schema({
     name: { type: String, required: true },
     icon: { type: String, default: '' },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -58,7 +84,7 @@ const Server = mongoose.model('Server', new mongoose.Schema({
     }]
 }));
 
-const Channel = mongoose.model('Channel', new mongoose.Schema({
+const Channel = mongoose.models.Channel || mongoose.model('Channel', new mongoose.Schema({
     name: { type: String, required: true },
     topic: { type: String, default: '' },
     serverId: { type: mongoose.Schema.Types.ObjectId, ref: 'Server' },
@@ -67,11 +93,11 @@ const Channel = mongoose.model('Channel', new mongoose.Schema({
     allowedRoles: [String]
 }));
 
-const DM = mongoose.model('DM', new mongoose.Schema({
+const DM = mongoose.models.DM || mongoose.model('DM', new mongoose.Schema({
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }));
 
-const Message = mongoose.model('Message', new mongoose.Schema({
+const Message = mongoose.models.Message || mongoose.model('Message', new mongoose.Schema({
     content: { type: String, required: true },
     authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     targetId: { type: mongoose.Schema.Types.ObjectId },
@@ -81,7 +107,7 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     timestamp: { type: Date, default: Date.now }
 }));
 
-const SystemConfig = mongoose.model('SystemConfig', new mongoose.Schema({
+const SystemConfig = mongoose.models.SystemConfig || mongoose.model('SystemConfig', new mongoose.Schema({
     key: { type: String, default: 'global', unique: true },
     maintenanceMode: { type: Boolean, default: false },
     allowEmojis: { type: Boolean, default: true },
@@ -98,7 +124,7 @@ const SystemConfig = mongoose.model('SystemConfig', new mongoose.Schema({
     customBadges: [{ name: String, color: String, icon: String }]
 }));
 
-const Ticket = mongoose.model('Ticket', new mongoose.Schema({
+const Ticket = mongoose.models.Ticket || mongoose.model('Ticket', new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     subject: String,
     message: String,
@@ -107,7 +133,7 @@ const Ticket = mongoose.model('Ticket', new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 }));
 
-const AuditLog = mongoose.model('AuditLog', new mongoose.Schema({
+const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', new mongoose.Schema({
     adminName: String,
     action: String,
     target: String,
@@ -142,17 +168,14 @@ async function initSystem() {
         }).save();
     }
 }
-mongoose.connection.once('open', initSystem);
 
 async function logAdmin(adminName, action, target) {
     await new AuditLog({ adminName: adminName || 'Admin', action, target }).save();
 }
 
 const userMessageTimestamps = {};
-// In-memory typing state: { [targetId]: { [userId]: { username, expiresAt } } }
 const typingState = {};
 
-// Helper to check a user's combined permissions in a server
 function getMemberServerPerms(server, user) {
     const perms = {
         manageServer: false,
@@ -181,10 +204,13 @@ function getMemberServerPerms(server, user) {
 // --- PUBLIC CONFIG & HEARTBEAT ---
 app.get('/api/config', async (req, res) => {
     const cfg = await SystemConfig.findOne({ key: 'global' });
-    res.json(cfg);
+    res.json(cfg || {});
 });
 
 app.post('/api/heartbeat/:userId', async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+        return res.status(400).json({ error: 'Invalid user ID' });
+    }
     const user = await User.findByIdAndUpdate(req.params.userId, { lastActive: new Date() }, { new: true });
     const cfg = await SystemConfig.findOne({ key: 'global' });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -203,7 +229,7 @@ app.post('/api/heartbeat/:userId', async (req, res) => {
         user,
         warning,
         maintenanceMode: cfg?.maintenanceMode || false,
-        config: cfg
+        config: cfg || {}
     });
 });
 
@@ -235,6 +261,9 @@ app.get('/api/typing/:targetId', (req, res) => {
 // --- UNREAD & PING TRACKER ---
 app.post('/api/unread-summary', async (req, res) => {
     const { userId, username, lastReadMap } = req.body;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.json({ targets: {}, servers: {} });
+    }
     const readMap = lastReadMap || {};
     const regex = username ? new RegExp(`@${username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i') : null;
 
@@ -383,7 +412,7 @@ app.get('/api/tickets/user/:userId', async (req, res) => {
     res.json(await Ticket.find({ userId: req.params.userId }).sort({ createdAt: -1 }));
 });
 
-// --- SERVERS, ROLES (CREATE, EDIT, REORDER, PERMS) & CHANNELS ---
+// --- SERVERS, ROLES & CHANNELS ---
 app.get('/api/servers/user/:userId', async (req, res) => res.json(await Server.find({ members: req.params.userId })));
 app.post('/api/servers', async (req, res) => {
     const server = new Server({
@@ -409,7 +438,6 @@ app.post('/api/servers/join/:code', async (req, res) => {
     res.json(server);
 });
 
-// Create Role with Permissions
 app.post('/api/servers/:serverId/roles', async (req, res) => {
     const { name, color, permissions } = req.body;
     const server = await Server.findByIdAndUpdate(
@@ -433,7 +461,6 @@ app.post('/api/servers/:serverId/roles', async (req, res) => {
     res.json(server);
 });
 
-// Edit Existing Role (Name, Color, Permissions)
 app.put('/api/servers/:serverId/roles/:roleId', async (req, res) => {
     const { name, color, permissions } = req.body;
     const server = await Server.findById(req.params.serverId);
@@ -450,7 +477,6 @@ app.put('/api/servers/:serverId/roles/:roleId', async (req, res) => {
     res.json(server);
 });
 
-// Rearrange Roles Order
 app.put('/api/servers/:serverId/roles-reorder', async (req, res) => {
     const { orderedRoleIds } = req.body;
     const server = await Server.findById(req.params.serverId);
@@ -469,7 +495,6 @@ app.put('/api/servers/:serverId/roles-reorder', async (req, res) => {
     res.json(server);
 });
 
-// Delete Role
 app.delete('/api/servers/:serverId/roles/:roleId', async (req, res) => {
     const server = await Server.findById(req.params.serverId);
     if (!server) return res.status(404).json({ error: 'Server not found' });
@@ -481,7 +506,6 @@ app.delete('/api/servers/:serverId/roles/:roleId', async (req, res) => {
     res.json(server);
 });
 
-// Assign / Remove Role for a Member
 app.put('/api/servers/:serverId/members/:userId/roles', async (req, res) => {
     const { roleId, action } = req.body;
     const server = await Server.findById(req.params.serverId);
@@ -534,7 +558,7 @@ app.get('/api/servers/:serverId/members', async (req, res) => {
     });
 });
 
-// --- MESSAGES (ZERO-DELAY FAST PATH) ---
+// --- MESSAGES ---
 app.get('/api/messages/:targetId', async (req, res) => {
     const messages = await Message.find({ targetId: req.params.targetId })
         .sort({ timestamp: 1 })
@@ -578,7 +602,6 @@ app.post('/api/messages/:targetId', async (req, res) => {
         finalContent = finalContent.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}]/gu, '');
     }
 
-    // Clear typing state on send
     if (typingState[req.params.targetId]) {
         delete typingState[req.params.targetId][userId];
     }
