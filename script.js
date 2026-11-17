@@ -12,7 +12,6 @@ let selectedUserDecoration = "";
 let editingRoleId = null;
 let lastTypingSentAt = 0;
 
-// Unread & Ping tracking state
 let lastReadMap = JSON.parse(localStorage.getItem('scene_last_read') || '{}');
 let unreadSummary = { targets: {}, servers: {} };
 let prevTotalPings = 0;
@@ -27,6 +26,25 @@ let selectedAdminUser = null;
 let selectedAdminServer = null;
 
 const verifiedSVG = `<svg class="verified-badge verified-svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor"/><path d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+// Crisp Discord-style vector icons for built-in badges
+const BUILTIN_BADGE_SVGS = {
+    'Staff': `<svg width="16" height="16" viewBox="0 0 24 24" fill="#ed4245"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1.06 13.54L7.4 12l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41-5.64 5.66z"/></svg>`,
+    'Early Supporter': `<svg width="16" height="16" viewBox="0 0 24 24" fill="#faa61a"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+    'Bug Hunter': `<svg width="16" height="16" viewBox="0 0 24 24" fill="#43b581"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>`,
+    'Official Bot': `<svg width="16" height="16" viewBox="0 0 24 24" fill="#5865F2"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5 2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5 2.5 2.5 0 0 0-2.5-2.5z"/></svg>`
+};
+
+function renderBadgeIcon(badgeName) {
+    const escapedName = badgeName.replace(/"/g, '&quot;');
+    if (BUILTIN_BADGE_SVGS[badgeName]) {
+        return `<span class="profile-badge-icon" data-tooltip="${escapedName}">${BUILTIN_BADGE_SVGS[badgeName]}</span>`;
+    }
+    const custom = (globalConfig.customBadges || []).find(cb => cb.name === badgeName);
+    const icon = custom && custom.icon ? custom.icon : '★';
+    const color = custom && custom.color ? custom.color : '#5865F2';
+    return `<span class="profile-badge-icon" data-tooltip="${escapedName}" style="color:${color};">${icon}</span>`;
+}
 
 function toBase64(file) {
     return new Promise((resolve, reject) => {
@@ -51,7 +69,7 @@ function playPingSound() {
         gain.connect(ctx.destination);
         osc.start();
         osc.stop(ctx.currentTime + 0.25);
-    } catch (e) { /* audio blocked before interaction */ }
+    } catch (e) {}
 }
 
 function markTargetAsRead(targetId) {
@@ -104,7 +122,11 @@ window.onload = () => {
         localStorage.setItem('pending_invite', invite);
         window.history.replaceState({}, document.title, "/");
     }
-    if (currentUser) showApp();
+    if (currentUser && currentUser._id) {
+        showApp();
+    } else {
+        localStorage.removeItem('scene_user');
+    }
 };
 
 function checkInvite() {
@@ -148,6 +170,7 @@ function logout() { localStorage.removeItem('scene_user'); location.reload(); }
 async function showApp() {
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('app-screen').classList.remove('hidden');
+    updateUserPanel();
     await runHeartbeat();
     updateUserPanel();
     await loadServers();
@@ -159,9 +182,13 @@ async function showApp() {
 
 // --- HEARTBEAT & UNREAD / PING SYNC ---
 async function runHeartbeat() {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser._id) return;
     try {
         const res = await fetch(`${API_URL}/heartbeat/${currentUser._id}`, { method: 'POST' });
+        if (res.status === 404 || res.status === 400) {
+            logout();
+            return;
+        }
         if (!res.ok) return;
         const data = await res.json();
         globalConfig = data.config || {};
@@ -178,8 +205,8 @@ async function runHeartbeat() {
             return;
         }
 
-        if (currentUser.avatarDecoration !== data.user.avatarDecoration) {
-            currentUser.avatarDecoration = data.user.avatarDecoration;
+        if (!realAdminUser && data.user) {
+            currentUser = { ...currentUser, ...data.user };
             localStorage.setItem('scene_user', JSON.stringify(currentUser));
             updateUserPanel();
         }
@@ -197,13 +224,12 @@ async function runHeartbeat() {
 
         document.getElementById('emoji-btn').style.display = globalConfig.allowEmojis === false ? 'none' : 'inline-block';
 
-        // Refresh unread & @ping summary
         await refreshUnreadSummary();
-    } catch (e) { /* ignore network blips */ }
+    } catch (e) {}
 }
 
 async function refreshUnreadSummary() {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser._id) return;
     try {
         if (currentTargetId) {
             lastReadMap[currentTargetId] = Date.now();
@@ -221,7 +247,6 @@ async function refreshUnreadSummary() {
         if (!res.ok) return;
         unreadSummary = await res.json();
 
-        // Count total pings across non-active targets
         let totalPings = 0;
         for (const [tid, st] of Object.entries(unreadSummary.targets || {})) {
             if (tid !== currentTargetId) totalPings += (st.pingCount || 0);
@@ -237,7 +262,6 @@ async function refreshUnreadSummary() {
 }
 
 function applyUnreadBadgesToUI() {
-    // 1. Update Server Icons (white side highlight + red ping circle)
     document.querySelectorAll('#servers-container .server-icon').forEach(el => {
         const sid = el.dataset.serverId;
         const st = unreadSummary.servers?.[sid] || { hasUnread: false, pingCount: 0 };
@@ -266,7 +290,6 @@ function applyUnreadBadgesToUI() {
         }
     });
 
-    // 2. Update Home DM Icon for unread DMs
     const homeIcon = document.getElementById('home-server-icon');
     if (homeIcon) {
         let dmUnread = false;
@@ -289,7 +312,6 @@ function applyUnreadBadgesToUI() {
         } else if (badge) badge.remove();
     }
 
-    // 3. Update Channels & DM List Items
     document.querySelectorAll('#sidebar-list .list-item').forEach(el => {
         const tid = el.dataset.targetId;
         if (!tid) return;
@@ -332,9 +354,10 @@ function dismissChangelog() {
 
 // --- PROFILE SETTINGS & ADMIN ---
 function updateUserPanel() {
-    document.getElementById('my-username').innerText = currentUser.username;
+    if (!currentUser) return;
+    document.getElementById('my-username').innerText = currentUser.username || 'User';
     document.getElementById('my-custom-status').innerText = currentUser.customStatus || 'Online';
-    document.getElementById('my-pfp').src = currentUser.pfp;
+    document.getElementById('my-pfp').src = currentUser.pfp || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.username || 'U')}&background=5865F2&color=fff`;
 
     const myDec = document.getElementById('my-decoration');
     const effectiveDec = getEffectiveDecoration(currentUser);
@@ -411,8 +434,10 @@ async function openUserSettings() {
         bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = currentUser.banner || '#36393f';
     }
 
-    const cfgRes = await fetch(`${API_URL}/config`);
-    globalConfig = await cfgRes.json();
+    try {
+        const cfgRes = await fetch(`${API_URL}/config`);
+        if (cfgRes.ok) globalConfig = await cfgRes.json();
+    } catch (e) {}
     selectedUserDecoration = getEffectiveDecoration(currentUser);
     renderUserDecorationPicker();
 }
@@ -486,7 +511,7 @@ async function loadServerRolesPane() {
     if (!activeServer) return;
     const res = await fetch(`${API_URL}/servers/${activeServer._id}/members`);
     const data = await res.json();
-    window.currentServerMembers = data.members;
+    window.currentServerMembers = data.members || [];
     window.currentServerRoles = data.roles || [];
     window.currentServerMemberRoles = data.memberRoles || [];
     activeServer.roles = window.currentServerRoles;
@@ -990,7 +1015,7 @@ function renderAdminUserBadges() {
     const container = document.getElementById('adm-u-badges');
     container.innerHTML = '';
     (selectedAdminUser.badges || []).forEach(b => {
-        container.innerHTML += `<span class="badge">${b}</span>`;
+        container.innerHTML += renderBadgeIcon(b);
     });
 }
 
@@ -1256,20 +1281,16 @@ window.showUserProfile = function(event, userId) {
         viewDec.classList.add('hidden');
     }
 
-    let statusText = user.customStatus || user.activity.charAt(0).toUpperCase() + user.activity.slice(1);
+    const act = user.activity || 'online';
+    let statusText = user.customStatus || act.charAt(0).toUpperCase() + act.slice(1);
     document.getElementById('view-status').innerText = statusText;
-    document.getElementById('view-activity-dot').className = `status-dot large ${user.activity}`;
+    document.getElementById('view-activity-dot').className = `status-dot large ${act}`;
     document.getElementById('view-bio').innerText = user.bio || '';
 
     const badgeContainer = document.getElementById('view-badges');
     badgeContainer.innerHTML = '';
     if (user.badges && user.badges.length > 0) {
-        user.badges.forEach(b => {
-            const custom = (globalConfig.customBadges || []).find(cb => cb.name === b);
-            const bg = custom ? custom.color : '#5865F2';
-            const icon = custom ? `${custom.icon} ` : '';
-            badgeContainer.innerHTML += `<span class="badge" style="background:${bg};">${icon}${b}</span>`;
-        });
+        badgeContainer.innerHTML = user.badges.map(b => renderBadgeIcon(b)).join('');
     }
 
     const rolesSection = document.getElementById('view-roles-section');
@@ -1333,63 +1354,69 @@ async function goHome() {
     document.getElementById('member-list').classList.add('hidden');
     document.getElementById('current-chat-topic').innerText = "";
 
-    const res = await fetch(`${API_URL}/users/${currentUser._id}/friends`);
-    const data = await res.json();
-    const list = document.getElementById('sidebar-list'); list.innerHTML = '';
+    try {
+        const res = await fetch(`${API_URL}/users/${currentUser._id}/friends`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = document.getElementById('sidebar-list'); list.innerHTML = '';
 
-    let firstFriendDiv = null;
+        let firstFriendDiv = null;
 
-    data.friends.forEach(f => {
-        window.userCache[f._id] = f;
-        const dm = data.dms.find(d => d.participants.includes(f._id));
-        if (!dm) return;
-        const effDec = getEffectiveDecoration(f);
-        const decHtml = effDec ? `<img src="${effDec}" class="avatar-decoration">` : '';
-        const div = document.createElement('div');
-        div.className = 'list-item';
-        div.dataset.targetId = dm._id;
-        div.dataset.dm = "true";
-        div.innerHTML = `<div class="avatar-wrapper"><img src="${f.pfp}" class="avatar" style="width:24px;height:24px;">${decHtml}<div class="status-dot ${f.activity}" style="width:8px;height:8px;bottom:0;right:0;"></div></div> <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.username}</span> ${f.isVerified ? verifiedSVG : ''}`;
-        div.onclick = (e) => {
-            document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
-            e.currentTarget.classList.add('active');
-            selectChat(dm._id, f.username, "", "@");
-        };
-        list.appendChild(div);
+        (data.friends || []).forEach(f => {
+            window.userCache[f._id] = f;
+            const dm = (data.dms || []).find(d => d.participants.includes(f._id));
+            if (!dm) return;
+            const effDec = getEffectiveDecoration(f);
+            const decHtml = effDec ? `<img src="${effDec}" class="avatar-decoration">` : '';
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.dataset.targetId = dm._id;
+            div.dataset.dm = "true";
+            div.innerHTML = `<div class="avatar-wrapper"><img src="${f.pfp}" class="avatar" style="width:24px;height:24px;">${decHtml}<div class="status-dot ${f.activity}" style="width:8px;height:8px;bottom:0;right:0;"></div></div> <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.username}</span> ${f.isVerified ? verifiedSVG : ''}`;
+            div.onclick = (e) => {
+                document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                selectChat(dm._id, f.username, "", "@");
+            };
+            list.appendChild(div);
 
-        if (!firstFriendDiv) firstFriendDiv = div;
-    });
+            if (!firstFriendDiv) firstFriendDiv = div;
+        });
 
-    applyUnreadBadgesToUI();
+        applyUnreadBadgesToUI();
 
-    if (firstFriendDiv) {
-        firstFriendDiv.click();
-    } else {
-        document.getElementById('current-chat-name').innerText = "No Friends Yet";
-        currentTargetId = null;
-        lastRenderedHash = "";
-        document.getElementById('messages-container').innerHTML = '';
-    }
+        if (firstFriendDiv) {
+            firstFriendDiv.click();
+        } else {
+            document.getElementById('current-chat-name').innerText = "No Friends Yet";
+            currentTargetId = null;
+            lastRenderedHash = "";
+            document.getElementById('messages-container').innerHTML = '';
+        }
+    } catch (e) {}
 }
 
 async function loadServers() {
-    const res = await fetch(`${API_URL}/servers/user/${currentUser._id}`);
-    const servers = await res.json();
-    const container = document.getElementById('servers-container'); container.innerHTML = '';
-    servers.forEach(s => {
-        const div = document.createElement('div');
-        div.className = 'server-icon';
-        div.dataset.serverId = s._id;
-        if (activeServer && activeServer._id === s._id) div.classList.add('active');
-        if (s.icon) div.style.backgroundImage = `url(${s.icon})`; else div.innerText = s.name.charAt(0).toUpperCase();
-        div.onclick = (e) => {
-            document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
-            e.currentTarget.classList.add('active');
-            selectServer(s);
-        };
-        container.appendChild(div);
-    });
-    applyUnreadBadgesToUI();
+    try {
+        const res = await fetch(`${API_URL}/servers/user/${currentUser._id}`);
+        if (!res.ok) return;
+        const servers = await res.json();
+        const container = document.getElementById('servers-container'); container.innerHTML = '';
+        (servers || []).forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'server-icon';
+            div.dataset.serverId = s._id;
+            if (activeServer && activeServer._id === s._id) div.classList.add('active');
+            if (s.icon) div.style.backgroundImage = `url(${s.icon})`; else div.innerText = s.name.charAt(0).toUpperCase();
+            div.onclick = (e) => {
+                document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                selectServer(s);
+            };
+            container.appendChild(div);
+        });
+        applyUnreadBadgesToUI();
+    } catch (e) {}
 }
 
 async function selectServer(server) {
