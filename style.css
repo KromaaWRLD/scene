@@ -33,7 +33,7 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 
 /* AVATAR DECORATION OVERLAYS */
 .avatar-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.avatar-decoration { position: absolute; top: -18%; left: -18%; width: 136%; height: 136%; pointer-events: none; z-index: 2; object-fit: contain; }
+.avatar-decoration { position: absolute; top: -14%; left: -16%; width: 136%; height: 136%; pointer-events: none; z-index: 2; object-fit: contain; }
 .avatar-decoration.large { top: -21%; left: -21%; width: 142%; height: 142%; }
 
 .decoration-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 10px; margin-top: 6px; }
@@ -167,7 +167,68 @@ body { background-color: #36393f; color: #dcddde; height: 100vh; overflow: hidde
 .profile-info h2 { color: white; font-size: 20px; }
 #view-disc { color: #b9bbbe; font-size: 16px; font-weight: normal; }
 .profile-status { color: #dcddde; font-size: 14px; margin-top: 8px; }
-.badges-container { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.badges-container { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+
+/* COMPACT DISCORD-STYLE ICON BADGES WITH TOOLTIP */
+.profile-badge-icon {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: #18191c;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.12s ease;
+    font-size: 14px;
+    user-select: none;
+}
+.profile-badge-icon:hover {
+    transform: translateY(-2px);
+    background: #202225;
+}
+.profile-badge-icon::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 7px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: #111214;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 9px;
+    border-radius: 5px;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 9999;
+}
+.profile-badge-icon::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px 5px 0 5px;
+    border-style: solid;
+    border-color: #111214 transparent transparent transparent;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+    z-index: 9999;
+}
+.profile-badge-icon:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.profile-badge-icon:hover::before {
+    opacity: 1;
+}
+
 .badge { background: #5865F2; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; text-transform: uppercase; font-weight: bold; display: inline-flex; align-items: center; gap: 4px; }
 .role-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .profile-section { background: #18191c; padding: 12px; border-radius: 8px; margin-top: 12px; }
