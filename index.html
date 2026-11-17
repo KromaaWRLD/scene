@@ -35,7 +35,7 @@
     <div id="app-screen" class="screen hidden app-container">
         <!-- Far Left: Servers -->
         <nav class="server-list">
-            <div class="server-icon home-icon active" onclick="goHome()">
+            <div class="server-icon home-icon active" id="home-server-icon" onclick="goHome()">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
             </div>
             <div class="divider"></div>
@@ -57,7 +57,7 @@
             <div id="add-friend-btn" class="action-btn" onclick="showModal('friend-modal')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#43b581" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Friend
             </div>
-            <div id="add-channel-btn" class="action-btn hidden" onclick="showModal('channel-modal')">
+            <div id="add-channel-btn" class="action-btn hidden" onclick="openCreateChannelModal()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Channel
             </div>
             
@@ -83,7 +83,7 @@
         <!-- Chat Area -->
         <main class="chat-area">
             <header class="chat-header">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#72767d" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                <span id="chat-header-icon" class="hash-header-icon">#</span>
                 <div>
                     <h3 id="current-chat-name">Select a Chat</h3>
                     <div id="current-chat-topic" style="font-size:12px; color:#b9bbbe; margin-top:2px;"></div>
@@ -91,6 +91,11 @@
             </header>
             <div class="messages-container" id="messages-container"></div>
             <div class="input-area" style="position:relative;">
+                <!-- LIVE TYPING INDICATOR -->
+                <div id="typing-indicator" class="hidden">
+                    <span class="typing-dots"><span></span><span></span><span></span></span>
+                    <span id="typing-text">Someone is typing...</span>
+                </div>
                 <div id="mention-suggestions" class="hidden"></div>
                 <emoji-picker id="emoji-picker" class="hidden"></emoji-picker>
                 <div id="reply-banner" class="hidden">
@@ -125,7 +130,8 @@
             
             <!-- Server Settings Tabs -->
             <div class="settings-tab" id="tab-server" onclick="showSettingsPane('settings-server-panel', this)" style="display:none;">Server Overview</div>
-            <div class="settings-tab" id="tab-server-roles" onclick="showSettingsPane('settings-roles-panel', this)" style="display:none;">Roles</div>
+            <div class="settings-tab" id="tab-server-roles" onclick="showSettingsPane('settings-roles-panel', this)" style="display:none;">Roles & Permissions</div>
+            <div class="settings-tab" id="tab-server-channels" onclick="showSettingsPane('settings-channels-panel', this)" style="display:none;">Channel Access</div>
             
             <div class="divider" style="margin: 8px 0;"></div>
             <div class="settings-tab danger" onclick="logout()">Log Out</div>
@@ -199,28 +205,41 @@
                 <button class="save-btn" onclick="saveServer()">Save Changes</button>
                 <div class="divider" style="margin: 20px 0; background:#4f545c;"></div>
                 <h3 style="color:white; margin-bottom:8px;">Channel Management</h3>
-                <button class="save-btn" style="background:#5865F2; margin-top:0;" onclick="closeSettings(); showModal('channel-modal');">Create New Channel</button>
+                <button class="save-btn" style="background:#5865F2; margin-top:0;" onclick="closeSettings(); openCreateChannelModal();">Create New Channel</button>
                 <div class="divider" style="margin: 20px 0; background:#4f545c;"></div>
                 <button class="save-btn danger" onclick="deleteServer()">Delete Server</button>
             </div>
 
-            <!-- SERVER ROLES CREATION & MANAGEMENT PANE -->
+            <!-- SERVER ROLES CREATION, REORDERING, EDITING & PERMISSIONS PANE -->
             <div id="settings-roles-panel" class="settings-pane hidden">
-                <h2>Server Roles</h2>
+                <h2>Server Roles & Permissions</h2>
                 <div class="admin-card">
                     <h3>Create New Role</h3>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <input type="text" id="new-role-name" placeholder="Role Name (e.g. Moderator, VIP)">
                         <input type="color" id="new-role-color" value="#5865F2" style="width:50px; height:38px; border:none; background:none; cursor:pointer;">
-                        <button class="save-btn" style="margin-top:0;" onclick="createServerRole()">Create Role</button>
                     </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px;">
+                        <label class="checkbox-row"><input type="checkbox" id="new-role-perm-server"> <span>Manage Server & Roles</span></label>
+                        <label class="checkbox-row"><input type="checkbox" id="new-role-perm-channels"> <span>Manage Channels</span></label>
+                        <label class="checkbox-row"><input type="checkbox" id="new-role-perm-messages"> <span>Delete Any Messages</span></label>
+                        <label class="checkbox-row"><input type="checkbox" id="new-role-perm-locked"> <span>Access All Locked Channels</span></label>
+                    </div>
+                    <button class="save-btn" style="margin-top:8px;" onclick="createServerRole()">Create Role</button>
                 </div>
 
-                <label style="margin-top:16px;">Existing Roles</label>
-                <div id="server-roles-list" class="admin-list"></div>
+                <label style="margin-top:16px;">Role Hierarchy (Top role sets username color — Use ▲/▼ to rearrange)</label>
+                <div id="server-roles-list" class="admin-list" style="max-height: 360px;"></div>
 
                 <label style="margin-top:16px;">Assign Roles to Members</label>
                 <div id="server-member-roles-list" class="admin-list" style="max-height:300px;"></div>
+            </div>
+
+            <!-- SERVER CHANNEL ACCESS PERMISSIONS PANE -->
+            <div id="settings-channels-panel" class="settings-pane hidden">
+                <h2>Channel Lock & Role Access</h2>
+                <p style="font-size:13px; color:#b9bbbe;">Lock specific `#` channels and choose which roles can view and chat in them.</p>
+                <div id="server-channel-perms-list" class="admin-list" style="max-height: 480px;"></div>
             </div>
 
             <!-- EXPANDED SYSTEM ADMIN PANEL -->
@@ -280,7 +299,6 @@
 
                 <!-- 4. AVATAR DECORATIONS, BADGES, TICKETS & CHANGELOG -->
                 <div id="adm-community" class="admin-subpane hidden">
-                    <!-- AVATAR DECORATION UPLOAD & TOGGLE -->
                     <div class="admin-card">
                         <h3>Avatar Decoration Studio</h3>
                         <label class="checkbox-row"><input type="checkbox" id="cfg-nonadmin-decorations" onchange="toggleNonAdminDecorations()"> <span>Allow Non-Admins to Wear Avatar Decorations (Admins can always wear them)</span></label>
@@ -356,6 +374,27 @@
                     <h4>About Me</h4>
                     <p id="view-bio"></p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT ROLE MODAL -->
+    <div id="edit-role-modal" class="modal hidden">
+        <div class="modal-content" style="width: 400px;">
+            <h3>Edit Role</h3>
+            <label style="font-size:12px; color:#b9bbbe;">Role Name & Color</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <input type="text" id="edit-role-name" style="flex:1;">
+                <input type="color" id="edit-role-color" style="width:45px; height:38px; border:none; background:none; cursor:pointer;">
+            </div>
+            <label style="font-size:12px; color:#b9bbbe; margin-top:6px;">Role Permissions</label>
+            <label class="checkbox-row"><input type="checkbox" id="edit-role-perm-server"> <span>Manage Server & Roles</span></label>
+            <label class="checkbox-row"><input type="checkbox" id="edit-role-perm-channels"> <span>Manage Channels</span></label>
+            <label class="checkbox-row"><input type="checkbox" id="edit-role-perm-messages"> <span>Delete Any Messages</span></label>
+            <label class="checkbox-row"><input type="checkbox" id="edit-role-perm-locked"> <span>Access All Locked Channels</span></label>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <button style="flex:1; background:#43b581;" onclick="saveEditedRole()">Save Role</button>
+                <button style="flex:1;" class="danger" onclick="hideModal('edit-role-modal')">Cancel</button>
             </div>
         </div>
     </div>
@@ -486,12 +525,16 @@
     </div></div>
     
     <div id="channel-modal" class="modal hidden"><div class="modal-content">
-        <h3>Create Channel</h3>
-        <input type="text" id="new-channel-name" placeholder="Channel Name">
+        <h3>Create # Channel</h3>
+        <input type="text" id="new-channel-name" placeholder="channel-name">
         <input type="text" id="new-channel-topic" placeholder="Channel Topic/Description" style="margin-top:8px;">
         <label style="color:#b9bbbe; font-size:14px; display:flex; align-items:center; gap:8px; margin-top:8px;">
-            <input type="checkbox" id="new-channel-locked"> Locked Channel (Admins & You)
+            <input type="checkbox" id="new-channel-locked" onchange="document.getElementById('new-channel-roles-box').classList.toggle('hidden', !this.checked)"> Private / Locked Channel
         </label>
+        <div id="new-channel-roles-box" class="hidden" style="margin-top:6px;">
+            <label style="font-size:12px; color:#b9bbbe;">Allow Roles to Access:</label>
+            <div id="new-channel-roles-list" style="max-height:100px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
+        </div>
         <button onclick="createChannel()" style="margin-top:12px;">Create</button>
         <button class="danger" onclick="hideModal('channel-modal')">Cancel</button>
     </div></div>
