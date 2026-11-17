@@ -44,7 +44,13 @@ const Server = mongoose.model('Server', new mongoose.Schema({
     maxChannels: { type: Number, default: 50 },
     roles: [{
         name: { type: String, required: true },
-        color: { type: String, default: '#99aab5' }
+        color: { type: String, default: '#99aab5' },
+        permissions: {
+            manageServer: { type: Boolean, default: false },
+            manageChannels: { type: Boolean, default: false },
+            manageMessages: { type: Boolean, default: false },
+            viewLockedChannels: { type: Boolean, default: false }
+        }
     }],
     memberRoles: [{
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -57,7 +63,8 @@ const Channel = mongoose.model('Channel', new mongoose.Schema({
     topic: { type: String, default: '' },
     serverId: { type: mongoose.Schema.Types.ObjectId, ref: 'Server' },
     isLocked: { type: Boolean, default: false },
-    allowedMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    allowedMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    allowedRoles: [String]
 }));
 
 const DM = mongoose.model('DM', new mongoose.Schema({
@@ -142,6 +149,34 @@ async function logAdmin(adminName, action, target) {
 }
 
 const userMessageTimestamps = {};
+// In-memory typing state: { [targetId]: { [userId]: { username, expiresAt } } }
+const typingState = {};
+
+// Helper to check a user's combined permissions in a server
+function getMemberServerPerms(server, user) {
+    const perms = {
+        manageServer: false,
+        manageChannels: false,
+        manageMessages: false,
+        viewLockedChannels: false
+    };
+    if (!server || !user) return perms;
+    if (server.ownerId?.toString() === user._id.toString() || user.isAdmin) {
+        return { manageServer: true, manageChannels: true, manageMessages: true, viewLockedChannels: true };
+    }
+    const entry = (server.memberRoles || []).find(mr => mr.userId.toString() === user._id.toString());
+    if (!entry) return perms;
+    for (const rid of entry.roleIds) {
+        const role = (server.roles || []).find(r => r._id.toString() === rid);
+        if (role && role.permissions) {
+            if (role.permissions.manageServer) perms.manageServer = true;
+            if (role.permissions.manageChannels) perms.manageChannels = true;
+            if (role.permissions.manageMessages) perms.manageMessages = true;
+            if (role.permissions.viewLockedChannels) perms.viewLockedChannels = true;
+        }
+    }
+    return perms;
+}
 
 // --- PUBLIC CONFIG & HEARTBEAT ---
 app.get('/api/config', async (req, res) => {
@@ -154,7 +189,6 @@ app.post('/api/heartbeat/:userId', async (req, res) => {
     const cfg = await SystemConfig.findOne({ key: 'global' });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Strip decoration if non-admin decorations were disabled by admins
     if (cfg && cfg.allowNonAdminDecorations === false && !user.isAdmin && user.avatarDecoration) {
         user.avatarDecoration = '';
         await user.save();
@@ -171,6 +205,77 @@ app.post('/api/heartbeat/:userId', async (req, res) => {
         maintenanceMode: cfg?.maintenanceMode || false,
         config: cfg
     });
+});
+
+// --- TYPING INDICATORS ---
+app.post('/api/typing/:targetId', (req, res) => {
+    const { userId, username } = req.body;
+    if (!typingState[req.params.targetId]) typingState[req.params.targetId] = {};
+    typingState[req.params.targetId][userId] = {
+        username,
+        expiresAt: Date.now() + 3500
+    };
+    res.json({ success: true });
+});
+
+app.get('/api/typing/:targetId', (req, res) => {
+    const now = Date.now();
+    const room = typingState[req.params.targetId] || {};
+    const active = [];
+    for (const [uid, info] of Object.entries(room)) {
+        if (info.expiresAt > now) {
+            active.push({ userId: uid, username: info.username });
+        } else {
+            delete room[uid];
+        }
+    }
+    res.json(active);
+});
+
+// --- UNREAD & PING TRACKER ---
+app.post('/api/unread-summary', async (req, res) => {
+    const { userId, username, lastReadMap } = req.body;
+    const readMap = lastReadMap || {};
+    const regex = username ? new RegExp(`@${username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i') : null;
+
+    const servers = await Server.find({ members: userId });
+    const dms = await DM.find({ participants: userId });
+    const serverIds = servers.map(s => s._id);
+    const channels = await Channel.find({ serverId: { $in: serverIds } });
+
+    const targets = [
+        ...channels.map(c => ({ id: c._id.toString(), serverId: c.serverId.toString() })),
+        ...dms.map(d => ({ id: d._id.toString(), serverId: null }))
+    ];
+
+    const targetStatus = {};
+    const serverStatus = {};
+
+    await Promise.all(targets.map(async t => {
+        const since = readMap[t.id] ? new Date(readMap[t.id]) : new Date(0);
+        const unreadMsgs = await Message.find({
+            targetId: t.id,
+            authorId: { $ne: userId },
+            timestamp: { $gt: since }
+        }, 'content');
+
+        const hasUnread = unreadMsgs.length > 0;
+        let pingCount = 0;
+        if (regex && hasUnread) {
+            unreadMsgs.forEach(m => {
+                if (regex.test(m.content)) pingCount++;
+            });
+        }
+
+        targetStatus[t.id] = { hasUnread, pingCount };
+        if (t.serverId) {
+            if (!serverStatus[t.serverId]) serverStatus[t.serverId] = { hasUnread: false, pingCount: 0 };
+            if (hasUnread) serverStatus[t.serverId].hasUnread = true;
+            serverStatus[t.serverId].pingCount += pingCount;
+        }
+    }));
+
+    res.json({ targets: targetStatus, servers: serverStatus });
 });
 
 // --- AUTH ---
@@ -278,7 +383,7 @@ app.get('/api/tickets/user/:userId', async (req, res) => {
     res.json(await Ticket.find({ userId: req.params.userId }).sort({ createdAt: -1 }));
 });
 
-// --- SERVERS, ROLES & CHANNELS ---
+// --- SERVERS, ROLES (CREATE, EDIT, REORDER, PERMS) & CHANNELS ---
 app.get('/api/servers/user/:userId', async (req, res) => res.json(await Server.find({ members: req.params.userId })));
 app.post('/api/servers', async (req, res) => {
     const server = new Server({
@@ -304,17 +409,67 @@ app.post('/api/servers/join/:code', async (req, res) => {
     res.json(server);
 });
 
-// Server Roles Endpoints
+// Create Role with Permissions
 app.post('/api/servers/:serverId/roles', async (req, res) => {
-    const { name, color } = req.body;
+    const { name, color, permissions } = req.body;
     const server = await Server.findByIdAndUpdate(
         req.params.serverId,
-        { $push: { roles: { name, color: color || '#99aab5' } } },
+        {
+            $push: {
+                roles: {
+                    name,
+                    color: color || '#99aab5',
+                    permissions: permissions || {
+                        manageServer: false,
+                        manageChannels: false,
+                        manageMessages: false,
+                        viewLockedChannels: false
+                    }
+                }
+            }
+        },
         { new: true }
     );
     res.json(server);
 });
 
+// Edit Existing Role (Name, Color, Permissions)
+app.put('/api/servers/:serverId/roles/:roleId', async (req, res) => {
+    const { name, color, permissions } = req.body;
+    const server = await Server.findById(req.params.serverId);
+    if (!server) return res.status(404).json({ error: 'Server not found' });
+
+    const role = server.roles.id(req.params.roleId);
+    if (!role) return res.status(404).json({ error: 'Role not found' });
+
+    if (name !== undefined) role.name = name;
+    if (color !== undefined) role.color = color;
+    if (permissions !== undefined) role.permissions = permissions;
+
+    await server.save();
+    res.json(server);
+});
+
+// Rearrange Roles Order
+app.put('/api/servers/:serverId/roles-reorder', async (req, res) => {
+    const { orderedRoleIds } = req.body;
+    const server = await Server.findById(req.params.serverId);
+    if (!server) return res.status(404).json({ error: 'Server not found' });
+
+    const roleMap = {};
+    server.roles.forEach(r => { roleMap[r._id.toString()] = r; });
+
+    const reordered = orderedRoleIds.map(id => roleMap[id]).filter(Boolean);
+    server.roles.forEach(r => {
+        if (!orderedRoleIds.includes(r._id.toString())) reordered.push(r);
+    });
+
+    server.roles = reordered;
+    await server.save();
+    res.json(server);
+});
+
+// Delete Role
 app.delete('/api/servers/:serverId/roles/:roleId', async (req, res) => {
     const server = await Server.findById(req.params.serverId);
     if (!server) return res.status(404).json({ error: 'Server not found' });
@@ -326,6 +481,7 @@ app.delete('/api/servers/:serverId/roles/:roleId', async (req, res) => {
     res.json(server);
 });
 
+// Assign / Remove Role for a Member
 app.put('/api/servers/:serverId/members/:userId/roles', async (req, res) => {
     const { roleId, action } = req.body;
     const server = await Server.findById(req.params.serverId);
@@ -352,12 +508,18 @@ app.post('/api/servers/:serverId/channels', async (req, res) => {
     if (server && existingCount >= (server.maxChannels || 50)) {
         return res.status(403).json({ error: `Channel limit (${server.maxChannels}) reached for this server.` });
     }
-    const newChannelData = { name: req.body.name, topic: req.body.topic, serverId: req.params.serverId };
-    if (req.body.isLocked) {
-        newChannelData.isLocked = true;
-        newChannelData.allowedMembers = [req.body.userId];
-    }
+    const newChannelData = {
+        name: req.body.name,
+        topic: req.body.topic,
+        serverId: req.params.serverId,
+        isLocked: !!req.body.isLocked,
+        allowedMembers: req.body.isLocked ? [req.body.userId] : [],
+        allowedRoles: req.body.allowedRoles || []
+    };
     res.json(await new Channel(newChannelData).save());
+});
+app.put('/api/channels/:id', async (req, res) => {
+    res.json(await Channel.findByIdAndUpdate(req.params.id, req.body, { new: true }));
 });
 app.delete('/api/channels/:id', async (req, res) => {
     await Channel.findByIdAndDelete(req.params.id);
@@ -416,13 +578,35 @@ app.post('/api/messages/:targetId', async (req, res) => {
         finalContent = finalContent.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}]/gu, '');
     }
 
+    // Clear typing state on send
+    if (typingState[req.params.targetId]) {
+        delete typingState[req.params.targetId][userId];
+    }
+
     const msg = new Message({ content: finalContent, authorId: userId, targetId: req.params.targetId, replyTo });
     await msg.save();
     res.json({ success: true, _id: msg._id });
 });
 
 app.put('/api/messages/edit/:msgId', async (req, res) => res.json(await Message.findByIdAndUpdate(req.params.msgId, { content: req.body.content, isEdited: true }, { new: true })));
-app.delete('/api/messages/:msgId', async (req, res) => { await Message.findByIdAndDelete(req.params.msgId); res.json({ success: true }); });
+app.delete('/api/messages/:msgId', async (req, res) => {
+    const msg = await Message.findById(req.params.msgId);
+    if (!msg) return res.status(404).json({ error: 'Message not found' });
+
+    const requesterId = req.query.userId;
+    if (requesterId && msg.authorId.toString() !== requesterId) {
+        const requester = await User.findById(requesterId);
+        const channel = await Channel.findById(msg.targetId);
+        const server = channel ? await Server.findById(channel.serverId) : null;
+        const perms = getMemberServerPerms(server, requester);
+        if (!requester?.isAdmin && !perms.manageMessages) {
+            return res.status(403).json({ error: 'Missing Delete Messages permission.' });
+        }
+    }
+
+    await Message.findByIdAndDelete(req.params.msgId);
+    res.json({ success: true });
+});
 
 // ==========================================
 // --- EXPANDED ADMIN PANEL ROUTES ---
@@ -498,7 +682,6 @@ app.delete('/api/admin/users/:id', async (req, res) => {
     res.json({ success: true });
 });
 
-// Servers Oversight
 app.get('/api/admin/servers', async (req, res) => {
     const servers = await Server.find({}).populate('ownerId', 'username discriminator');
     res.json(servers);
@@ -544,7 +727,6 @@ app.put('/api/admin/servers/verify/:id', async (req, res) => {
     res.json(s);
 });
 
-// Official SYSTEM Message Broadcaster
 app.get('/api/admin/all-channels', async (req, res) => {
     const channels = await Channel.find({}).populate('serverId', 'name');
     res.json(channels);
@@ -566,7 +748,6 @@ app.post('/api/admin/system-message', async (req, res) => {
     res.json(msg);
 });
 
-// System Config, Avatar Decorations, Badge Studio, Audit Logs, Tickets
 app.put('/api/admin/config', async (req, res) => {
     const { adminName, ...updates } = req.body;
     const cfg = await SystemConfig.findOneAndUpdate({ key: 'global' }, updates, { new: true, upsert: true });
@@ -623,7 +804,7 @@ app.put('/api/admin/tickets/:id', async (req, res) => {
 
 if (process.env.VERCEL !== '1') {
     const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
 }
 
 module.exports = app;
