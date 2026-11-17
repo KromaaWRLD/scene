@@ -9,6 +9,13 @@ let replyingToId = null;
 let lastRenderedHash = "";
 let globalConfig = {};
 let selectedUserDecoration = "";
+let editingRoleId = null;
+let lastTypingSentAt = 0;
+
+// Unread & Ping tracking state
+let lastReadMap = JSON.parse(localStorage.getItem('scene_last_read') || '{}');
+let unreadSummary = { targets: {}, servers: {} };
+let prevTotalPings = 0;
 
 window.userCache = {};
 window.currentServerMembers = [];
@@ -30,6 +37,33 @@ function toBase64(file) {
     });
 }
 
+function playPingSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1174.66, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+    } catch (e) { /* audio blocked before interaction */ }
+}
+
+function markTargetAsRead(targetId) {
+    if (!targetId) return;
+    lastReadMap[targetId] = Date.now();
+    localStorage.setItem('scene_last_read', JSON.stringify(lastReadMap));
+    if (unreadSummary.targets[targetId]) {
+        unreadSummary.targets[targetId] = { hasUnread: false, pingCount: 0 };
+    }
+    applyUnreadBadgesToUI();
+}
+
 function getEffectiveDecoration(user) {
     if (!user || !user.avatarDecoration) return '';
     if (globalConfig.allowNonAdminDecorations === false && !user.isAdmin) return '';
@@ -43,6 +77,24 @@ function getUserServerRoles(userId) {
     return entry.roleIds
         .map(rid => window.currentServerRoles.find(r => r._id === rid))
         .filter(Boolean);
+}
+
+function getMyServerPermissions() {
+    const perms = { manageServer: false, manageChannels: false, manageMessages: false, viewLockedChannels: false };
+    if (!activeServer || !currentUser) return perms;
+    if (activeServer.ownerId === currentUser._id || (currentUser.isAdmin && !realAdminUser)) {
+        return { manageServer: true, manageChannels: true, manageMessages: true, viewLockedChannels: true };
+    }
+    const roles = getUserServerRoles(currentUser._id);
+    roles.forEach(r => {
+        if (r.permissions) {
+            if (r.permissions.manageServer) perms.manageServer = true;
+            if (r.permissions.manageChannels) perms.manageChannels = true;
+            if (r.permissions.manageMessages) perms.manageMessages = true;
+            if (r.permissions.viewLockedChannels) perms.viewLockedChannels = true;
+        }
+    });
+    return perms;
 }
 
 window.onload = () => {
@@ -98,14 +150,14 @@ async function showApp() {
     document.getElementById('app-screen').classList.remove('hidden');
     await runHeartbeat();
     updateUserPanel();
-    loadServers();
+    await loadServers();
     goHome();
     checkInvite();
     if (heartbeatInterval) clearInterval(heartbeatInterval);
-    heartbeatInterval = setInterval(runHeartbeat, 4000);
+    heartbeatInterval = setInterval(runHeartbeat, 3500);
 }
 
-// --- HEARTBEAT ---
+// --- HEARTBEAT & UNREAD / PING SYNC ---
 async function runHeartbeat() {
     if (!currentUser) return;
     try {
@@ -126,7 +178,6 @@ async function runHeartbeat() {
             return;
         }
 
-        // Sync decoration state if admin toggled non-admin permissions
         if (currentUser.avatarDecoration !== data.user.avatarDecoration) {
             currentUser.avatarDecoration = data.user.avatarDecoration;
             localStorage.setItem('scene_user', JSON.stringify(currentUser));
@@ -145,7 +196,131 @@ async function runHeartbeat() {
         }
 
         document.getElementById('emoji-btn').style.display = globalConfig.allowEmojis === false ? 'none' : 'inline-block';
+
+        // Refresh unread & @ping summary
+        await refreshUnreadSummary();
     } catch (e) { /* ignore network blips */ }
+}
+
+async function refreshUnreadSummary() {
+    if (!currentUser) return;
+    try {
+        if (currentTargetId) {
+            lastReadMap[currentTargetId] = Date.now();
+            localStorage.setItem('scene_last_read', JSON.stringify(lastReadMap));
+        }
+        const res = await fetch(`${API_URL}/unread-summary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: currentUser._id,
+                username: currentUser.username,
+                lastReadMap
+            })
+        });
+        if (!res.ok) return;
+        unreadSummary = await res.json();
+
+        // Count total pings across non-active targets
+        let totalPings = 0;
+        for (const [tid, st] of Object.entries(unreadSummary.targets || {})) {
+            if (tid !== currentTargetId) totalPings += (st.pingCount || 0);
+        }
+        if (totalPings > prevTotalPings) {
+            playPingSound();
+        }
+        prevTotalPings = totalPings;
+        document.title = totalPings > 0 ? `(${totalPings}) Scene` : 'Scene';
+
+        applyUnreadBadgesToUI();
+    } catch (e) {}
+}
+
+function applyUnreadBadgesToUI() {
+    // 1. Update Server Icons (white side highlight + red ping circle)
+    document.querySelectorAll('#servers-container .server-icon').forEach(el => {
+        const sid = el.dataset.serverId;
+        const st = unreadSummary.servers?.[sid] || { hasUnread: false, pingCount: 0 };
+        let pill = el.querySelector('.unread-pill');
+        let badge = el.querySelector('.ping-badge');
+
+        if (st.hasUnread || el.classList.contains('active')) {
+            if (!pill) {
+                pill = document.createElement('div');
+                pill.className = 'unread-pill';
+                el.appendChild(pill);
+            }
+        } else if (pill) {
+            pill.remove();
+        }
+
+        if (st.pingCount > 0) {
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'ping-badge';
+                el.appendChild(badge);
+            }
+            badge.innerText = st.pingCount > 99 ? '99+' : st.pingCount;
+        } else if (badge) {
+            badge.remove();
+        }
+    });
+
+    // 2. Update Home DM Icon for unread DMs
+    const homeIcon = document.getElementById('home-server-icon');
+    if (homeIcon) {
+        let dmUnread = false;
+        let dmPings = 0;
+        document.querySelectorAll('#sidebar-list .list-item[data-dm="true"]').forEach(el => {
+            const tid = el.dataset.targetId;
+            const st = unreadSummary.targets?.[tid];
+            if (st?.hasUnread) dmUnread = true;
+            dmPings += (st?.pingCount || 0);
+        });
+        let pill = homeIcon.querySelector('.unread-pill');
+        let badge = homeIcon.querySelector('.ping-badge');
+        if (dmUnread || homeIcon.classList.contains('active')) {
+            if (!pill) { pill = document.createElement('div'); pill.className = 'unread-pill'; homeIcon.appendChild(pill); }
+        } else if (pill) pill.remove();
+
+        if (dmPings > 0) {
+            if (!badge) { badge = document.createElement('div'); badge.className = 'ping-badge'; homeIcon.appendChild(badge); }
+            badge.innerText = dmPings;
+        } else if (badge) badge.remove();
+    }
+
+    // 3. Update Channels & DM List Items
+    document.querySelectorAll('#sidebar-list .list-item').forEach(el => {
+        const tid = el.dataset.targetId;
+        if (!tid) return;
+        const isCurrent = tid === currentTargetId;
+        const st = isCurrent ? { hasUnread: false, pingCount: 0 } : (unreadSummary.targets?.[tid] || { hasUnread: false, pingCount: 0 });
+
+        el.classList.toggle('has-unread', st.hasUnread);
+
+        let pill = el.querySelector('.channel-unread-pill');
+        if (st.hasUnread) {
+            if (!pill) {
+                pill = document.createElement('div');
+                pill.className = 'channel-unread-pill';
+                el.appendChild(pill);
+            }
+        } else if (pill) {
+            pill.remove();
+        }
+
+        let badge = el.querySelector('.channel-ping-badge');
+        if (st.pingCount > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'channel-ping-badge';
+                el.appendChild(badge);
+            }
+            badge.innerText = st.pingCount > 99 ? '99+' : st.pingCount;
+        } else if (badge) {
+            badge.remove();
+        }
+    });
 }
 
 function dismissChangelog() {
@@ -195,6 +370,7 @@ function showSettingsPane(id, tabEl = null) {
     if (id === 'settings-admin-panel') loadAdminPanel();
     if (id === 'settings-support-panel') loadUserSupportPane();
     if (id === 'settings-roles-panel') loadServerRolesPane();
+    if (id === 'settings-channels-panel') loadServerChannelPermsPane();
 }
 
 function openAdminSettingsQuickly() {
@@ -205,6 +381,7 @@ function openAdminSettingsQuickly() {
     document.getElementById('tab-admin').style.display = 'block';
     document.getElementById('tab-server').style.display = 'none';
     document.getElementById('tab-server-roles').style.display = 'none';
+    document.getElementById('tab-server-channels').style.display = 'none';
     showSettingsPane('settings-admin-panel', document.getElementById('tab-admin'));
 }
 
@@ -217,6 +394,7 @@ async function openUserSettings() {
     if (currentUser.isAdmin && !realAdminUser) document.getElementById('tab-admin').style.display = 'block';
     document.getElementById('tab-server').style.display = 'none';
     document.getElementById('tab-server-roles').style.display = 'none';
+    document.getElementById('tab-server-channels').style.display = 'none';
 
     showSettingsPane('settings-user-panel', document.getElementById('tab-my-account'));
 
@@ -233,7 +411,6 @@ async function openUserSettings() {
         bannerEl.style.backgroundImage = 'none'; bannerEl.style.backgroundColor = currentUser.banner || '#36393f';
     }
 
-    // Load latest config for Avatar Decorations
     const cfgRes = await fetch(`${API_URL}/config`);
     globalConfig = await cfgRes.json();
     selectedUserDecoration = getEffectiveDecoration(currentUser);
@@ -260,7 +437,6 @@ function renderUserDecorationPicker() {
     }
     disabledMsg.classList.add('hidden');
 
-    // "None" option
     const noneCard = document.createElement('div');
     noneCard.className = `decoration-card ${!selectedUserDecoration ? 'selected' : ''}`;
     noneCard.innerHTML = `<div style="width:44px;height:44px;border-radius:50%;background:#36393f;display:flex;align-items:center;justify-content:center;color:#72767d;font-size:18px;">✕</div><span>None</span>`;
@@ -297,6 +473,7 @@ function openServerSettings() {
     document.getElementById('tab-admin').style.display = 'none';
     document.getElementById('tab-server').style.display = 'block';
     document.getElementById('tab-server-roles').style.display = 'block';
+    document.getElementById('tab-server-channels').style.display = 'block';
 
     showSettingsPane('settings-server-panel', document.getElementById('tab-server'));
 
@@ -304,7 +481,7 @@ function openServerSettings() {
     document.getElementById('server-invite-link').value = `${window.location.origin}/?invite=${activeServer.inviteCode}`;
 }
 
-// --- SERVER ROLES MANAGEMENT ---
+// --- SERVER ROLES CREATION, REORDERING, EDITING & PERMISSIONS ---
 async function loadServerRolesPane() {
     if (!activeServer) return;
     const res = await fetch(`${API_URL}/servers/${activeServer._id}/members`);
@@ -317,13 +494,32 @@ async function loadServerRolesPane() {
 
     const rolesList = document.getElementById('server-roles-list');
     rolesList.innerHTML = window.currentServerRoles.length ? '' : '<div style="color:#72767d;font-size:13px;">No custom roles created yet.</div>';
-    window.currentServerRoles.forEach(r => {
+
+    window.currentServerRoles.forEach((r, idx) => {
+        const p = r.permissions || {};
+        const permTags = [
+            p.manageServer ? 'Manage Server' : '',
+            p.manageChannels ? 'Manage Channels' : '',
+            p.manageMessages ? 'Delete Messages' : '',
+            p.viewLockedChannels ? 'Locked Channels' : ''
+        ].filter(Boolean).join(' • ') || 'Basic Member Permissions';
+
         rolesList.innerHTML += `<div class="admin-item">
-            <div style="display:flex;align-items:center;gap:8px;">
-                <span class="role-dot" style="background:${r.color}; width:14px; height:14px;"></span>
-                <b style="color:${r.color};">${r.name}</b>
+            <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                    <button class="btn-neutral" style="padding:2px 6px; font-size:10px;" ${idx === 0 ? 'disabled style="opacity:0.3;padding:2px 6px;font-size:10px;"' : ''} onclick="moveServerRole(${idx}, -1)">▲</button>
+                    <button class="btn-neutral" style="padding:2px 6px; font-size:10px;" ${idx === window.currentServerRoles.length - 1 ? 'disabled style="opacity:0.3;padding:2px 6px;font-size:10px;"' : ''} onclick="moveServerRole(${idx}, 1)">▼</button>
+                </div>
+                <span class="role-dot" style="background:${r.color}; width:14px; height:14px; flex-shrink:0;"></span>
+                <div>
+                    <b style="color:${r.color};">${r.name}</b>
+                    <div style="font-size:11px; color:#8e9297;">${permTags}</div>
+                </div>
             </div>
-            <button class="btn-del" onclick="deleteServerRole('${r._id}')">Delete</button>
+            <div style="display:flex; gap:5px; flex-shrink:0;">
+                <button class="btn-verify" onclick="openEditRoleModal('${r._id}')">Edit</button>
+                <button class="btn-del" onclick="deleteServerRole('${r._id}')">Delete</button>
+            </div>
         </div>`;
     });
 
@@ -355,13 +551,79 @@ async function createServerRole() {
     const name = document.getElementById('new-role-name').value.trim();
     const color = document.getElementById('new-role-color').value;
     if (!name) return alert("Enter a role name.");
+
+    const permissions = {
+        manageServer: document.getElementById('new-role-perm-server').checked,
+        manageChannels: document.getElementById('new-role-perm-channels').checked,
+        manageMessages: document.getElementById('new-role-perm-messages').checked,
+        viewLockedChannels: document.getElementById('new-role-perm-locked').checked
+    };
+
     await fetch(`${API_URL}/servers/${activeServer._id}/roles`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, color })
+        body: JSON.stringify({ name, color, permissions })
     });
     document.getElementById('new-role-name').value = '';
+    document.getElementById('new-role-perm-server').checked = false;
+    document.getElementById('new-role-perm-channels').checked = false;
+    document.getElementById('new-role-perm-messages').checked = false;
+    document.getElementById('new-role-perm-locked').checked = false;
+
     await loadServerRolesPane();
     loadMembers(activeServer._id);
+}
+
+function openEditRoleModal(roleId) {
+    const role = window.currentServerRoles.find(r => r._id === roleId);
+    if (!role) return;
+    editingRoleId = roleId;
+    document.getElementById('edit-role-name').value = role.name;
+    document.getElementById('edit-role-color').value = role.color || '#99aab5';
+    const p = role.permissions || {};
+    document.getElementById('edit-role-perm-server').checked = !!p.manageServer;
+    document.getElementById('edit-role-perm-channels').checked = !!p.manageChannels;
+    document.getElementById('edit-role-perm-messages').checked = !!p.manageMessages;
+    document.getElementById('edit-role-perm-locked').checked = !!p.viewLockedChannels;
+    showModal('edit-role-modal');
+}
+
+async function saveEditedRole() {
+    if (!editingRoleId) return;
+    const name = document.getElementById('edit-role-name').value.trim();
+    const color = document.getElementById('edit-role-color').value;
+    const permissions = {
+        manageServer: document.getElementById('edit-role-perm-server').checked,
+        manageChannels: document.getElementById('edit-role-perm-channels').checked,
+        manageMessages: document.getElementById('edit-role-perm-messages').checked,
+        viewLockedChannels: document.getElementById('edit-role-perm-locked').checked
+    };
+    await fetch(`${API_URL}/servers/${activeServer._id}/roles/${editingRoleId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color, permissions })
+    });
+    hideModal('edit-role-modal');
+    await loadServerRolesPane();
+    loadMembers(activeServer._id);
+    lastRenderedHash = "";
+    loadMessages(false);
+}
+
+async function moveServerRole(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= window.currentServerRoles.length) return;
+    const arr = [...window.currentServerRoles];
+    const [moved] = arr.splice(index, 1);
+    arr.splice(newIndex, 0, moved);
+    const orderedRoleIds = arr.map(r => r._id);
+
+    await fetch(`${API_URL}/servers/${activeServer._id}/roles-reorder`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedRoleIds })
+    });
+    await loadServerRolesPane();
+    loadMembers(activeServer._id);
+    lastRenderedHash = "";
+    loadMessages(false);
 }
 
 async function deleteServerRole(roleId) {
@@ -385,6 +647,76 @@ async function toggleMemberRole(userId, roleId, action) {
     loadMembers(activeServer._id);
     lastRenderedHash = "";
     loadMessages(false);
+}
+
+// --- CHANNEL ACCESS PERMISSIONS ---
+async function loadServerChannelPermsPane() {
+    if (!activeServer) return;
+    const res = await fetch(`${API_URL}/servers/${activeServer._id}/channels`);
+    const channels = await res.json();
+    const container = document.getElementById('server-channel-perms-list');
+    container.innerHTML = '';
+
+    channels.forEach(ch => {
+        const rolesCheckboxes = window.currentServerRoles.map(r => {
+            const checked = (ch.allowedRoles || []).includes(r._id) ? 'checked' : '';
+            return `<label class="checkbox-row" style="font-size:12px;"><input type="checkbox" ${checked} onchange="toggleChannelRoleAccess('${ch._id}', '${r._id}', this.checked)"> <span style="color:${r.color};">${r.name}</span></label>`;
+        }).join('');
+
+        container.innerHTML += `<div class="admin-item" style="flex-direction:column; align-items:flex-start;">
+            <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                <b># ${ch.name}</b>
+                <label class="checkbox-row" style="font-size:12px;">
+                    <input type="checkbox" ${ch.isLocked ? 'checked' : ''} onchange="toggleChannelLockState('${ch._id}', this.checked)">
+                    <span>Locked Channel</span>
+                </label>
+            </div>
+            ${ch.isLocked ? `<div style="margin-top:6px; width:100%; border-top:1px solid #2f3136; padding-top:6px;">
+                <div style="font-size:11px; color:#8e9297; margin-bottom:4px;">Roles allowed to access #${ch.name}:</div>
+                <div style="display:flex; flex-wrap:wrap; gap:10px;">${rolesCheckboxes || '<span style="font-size:11px;color:#72767d;">Create roles first to assign channel access.</span>'}</div>
+            </div>` : ''}
+        </div>`;
+    });
+}
+
+async function toggleChannelLockState(channelId, isLocked) {
+    await fetch(`${API_URL}/channels/${channelId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isLocked })
+    });
+    loadServerChannelPermsPane();
+    loadChannels(activeServer._id);
+}
+
+async function toggleChannelRoleAccess(channelId, roleId, allowed) {
+    const res = await fetch(`${API_URL}/servers/${activeServer._id}/channels`);
+    const channels = await res.json();
+    const ch = channels.find(c => c._id === channelId);
+    if (!ch) return;
+
+    let updated = ch.allowedRoles || [];
+    if (allowed && !updated.includes(roleId)) updated.push(roleId);
+    if (!allowed) updated = updated.filter(id => id !== roleId);
+
+    await fetch(`${API_URL}/channels/${channelId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowedRoles: updated })
+    });
+    loadChannels(activeServer._id);
+}
+
+function openCreateChannelModal() {
+    document.getElementById('new-channel-name').value = '';
+    document.getElementById('new-channel-topic').value = '';
+    document.getElementById('new-channel-locked').checked = false;
+    document.getElementById('new-channel-roles-box').classList.add('hidden');
+
+    const rolesList = document.getElementById('new-channel-roles-list');
+    rolesList.innerHTML = window.currentServerRoles.map(r =>
+        `<label class="checkbox-row" style="font-size:13px;"><input type="checkbox" class="new-ch-role-cb" value="${r._id}"> <span style="color:${r.color};">${r.name}</span></label>`
+    ).join('') || '<span style="font-size:12px;color:#72767d;">No roles created yet.</span>';
+
+    showModal('channel-modal');
 }
 
 async function saveProfile() {
@@ -533,7 +865,6 @@ async function loadAdminPanel() {
     document.getElementById('cfg-changelog-text').value = cfg.changelogText || '';
     document.getElementById('cfg-tos-text').value = cfg.tosText || '';
 
-    // Render Avatar Decorations in Admin Studio
     const decList = document.getElementById('admin-decoration-list');
     decList.innerHTML = '';
     (cfg.avatarDecorations || []).forEach(dec => {
@@ -547,14 +878,12 @@ async function loadAdminPanel() {
         </div>`;
     });
 
-    // Badge Studio List
     const bList = document.getElementById('badge-studio-list');
     bList.innerHTML = '';
     (cfg.customBadges || []).forEach(b => {
         bList.innerHTML += `<span class="badge" style="background:${b.color}; font-size:12px; padding:4px 8px;">${b.icon} ${b.name}</span>`;
     });
 
-    // All Channels Dropdown
     const chRes = await fetch(`${API_URL}/admin/all-channels`);
     const channels = await chRes.json();
     const chSelect = document.getElementById('sys-msg-channel');
@@ -564,7 +893,6 @@ async function loadAdminPanel() {
         chSelect.innerHTML += `<option value="${c._id}">[${srvName}] #${c.name}</option>`;
     });
 
-    // Tickets
     const tRes = await fetch(`${API_URL}/admin/tickets`);
     const tickets = await tRes.json();
     const tContainer = document.getElementById('admin-tickets-list');
@@ -584,7 +912,6 @@ async function loadAdminPanel() {
         </div>`;
     });
 
-    // Audit Logs
     const aRes = await fetch(`${API_URL}/admin/audit-logs`);
     const logs = await aRes.json();
     const aContainer = document.getElementById('admin-audit-list');
@@ -597,7 +924,6 @@ async function loadAdminPanel() {
     });
 }
 
-// --- ADMIN AVATAR DECORATION STUDIO ACTIONS ---
 async function uploadAvatarDecoration() {
     const name = document.getElementById('new-decoration-name').value.trim();
     const file = document.getElementById('new-decoration-file').files[0];
@@ -946,7 +1272,6 @@ window.showUserProfile = function(event, userId) {
         });
     }
 
-    // Server Roles inside Profile Popout
     const rolesSection = document.getElementById('view-roles-section');
     const rolesContainer = document.getElementById('view-roles');
     const userRoles = getUserServerRoles(userId);
@@ -976,7 +1301,6 @@ window.showUserProfile = function(event, userId) {
     modal.style.top = y + 'px';
 }
 
-// Global Click Closer
 document.addEventListener('click', (e) => {
     const profileModal = document.getElementById('view-profile-modal');
     if (profileModal && !profileModal.classList.contains('hidden') && !e.target.closest('#view-profile-modal')) {
@@ -1001,6 +1325,7 @@ async function goHome() {
     document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
     document.querySelector('.home-icon').classList.add('active');
     document.getElementById('sidebar-title').innerText = "Direct Messages";
+    document.getElementById('chat-header-icon').innerText = "@";
 
     document.getElementById('add-friend-btn').classList.remove('hidden');
     document.getElementById('add-channel-btn').classList.add('hidden');
@@ -1020,16 +1345,22 @@ async function goHome() {
         if (!dm) return;
         const effDec = getEffectiveDecoration(f);
         const decHtml = effDec ? `<img src="${effDec}" class="avatar-decoration">` : '';
-        const div = document.createElement('div'); div.className = 'list-item';
-        div.innerHTML = `<div class="avatar-wrapper"><img src="${f.pfp}" class="avatar" style="width:24px;height:24px;">${decHtml}<div class="status-dot ${f.activity}" style="width:8px;height:8px;bottom:0;right:0;"></div></div> ${f.username} ${f.isVerified ? verifiedSVG : ''}`;
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.dataset.targetId = dm._id;
+        div.dataset.dm = "true";
+        div.innerHTML = `<div class="avatar-wrapper"><img src="${f.pfp}" class="avatar" style="width:24px;height:24px;">${decHtml}<div class="status-dot ${f.activity}" style="width:8px;height:8px;bottom:0;right:0;"></div></div> <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.username}</span> ${f.isVerified ? verifiedSVG : ''}`;
         div.onclick = (e) => {
             document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
-            e.currentTarget.classList.add('active'); selectChat(dm._id, `@${f.username}`);
+            e.currentTarget.classList.add('active');
+            selectChat(dm._id, f.username, "", "@");
         };
         list.appendChild(div);
 
         if (!firstFriendDiv) firstFriendDiv = div;
     });
+
+    applyUnreadBadgesToUI();
 
     if (firstFriendDiv) {
         firstFriendDiv.click();
@@ -1046,28 +1377,35 @@ async function loadServers() {
     const servers = await res.json();
     const container = document.getElementById('servers-container'); container.innerHTML = '';
     servers.forEach(s => {
-        const div = document.createElement('div'); div.className = 'server-icon';
+        const div = document.createElement('div');
+        div.className = 'server-icon';
+        div.dataset.serverId = s._id;
+        if (activeServer && activeServer._id === s._id) div.classList.add('active');
         if (s.icon) div.style.backgroundImage = `url(${s.icon})`; else div.innerText = s.name.charAt(0).toUpperCase();
         div.onclick = (e) => {
             document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
-            e.target.classList.add('active'); selectServer(s);
+            e.currentTarget.classList.add('active');
+            selectServer(s);
         };
         container.appendChild(div);
     });
+    applyUnreadBadgesToUI();
 }
 
 async function selectServer(server) {
     activeServer = server;
     document.getElementById('sidebar-title').innerHTML = `${server.name} ${server.isVerified ? verifiedSVG : ''}`;
     document.getElementById('add-friend-btn').classList.add('hidden');
-    const isOwner = server.ownerId === currentUser._id;
-    const isSysAdmin = currentUser.isAdmin === true && !realAdminUser;
-    document.getElementById('add-channel-btn').classList.toggle('hidden', !isOwner && !isSysAdmin);
-    document.getElementById('server-settings-btn').classList.toggle('hidden', !isOwner && !isSysAdmin);
     document.getElementById('member-list').classList.remove('hidden');
 
     await loadMembers(server._id);
+
+    const perms = getMyServerPermissions();
+    document.getElementById('add-channel-btn').classList.toggle('hidden', !perms.manageChannels);
+    document.getElementById('server-settings-btn').classList.toggle('hidden', !perms.manageServer);
+
     loadChannels(server._id);
+    applyUnreadBadgesToUI();
 }
 
 // RIGHT CLICK CONTEXT MENU
@@ -1075,7 +1413,8 @@ let contextTargetId = null;
 function showContextMenu(e, id, type) {
     e.preventDefault();
     e.stopPropagation();
-    if (activeServer && (activeServer.ownerId === currentUser._id || (currentUser.isAdmin && !realAdminUser))) {
+    const perms = getMyServerPermissions();
+    if (activeServer && perms.manageChannels) {
         const menu = document.getElementById('context-menu');
         menu.style.left = `${e.pageX}px`;
         menu.style.top = `${e.pageY}px`;
@@ -1095,31 +1434,43 @@ async function loadChannels(serverId) {
     const channels = await res.json();
     const list = document.getElementById('sidebar-list'); list.innerHTML = '';
 
+    const perms = getMyServerPermissions();
+    const myRoles = getUserServerRoles(currentUser._id).map(r => r._id);
+
     let firstAllowedChannel = null;
 
     channels.forEach((c) => {
-        const isAllowed = !c.isLocked || c.allowedMembers?.includes(currentUser._id) || activeServer.ownerId === currentUser._id || (currentUser.isAdmin && !realAdminUser);
-        const lockIcon = c.isLocked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#72767d" stroke-width="2" style="margin-left:auto;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>` : '';
+        const hasRoleAccess = (c.allowedRoles || []).some(rid => myRoles.includes(rid));
+        const isAllowed = !c.isLocked
+            || c.allowedMembers?.includes(currentUser._id)
+            || hasRoleAccess
+            || perms.viewLockedChannels;
 
-        const div = document.createElement('div'); div.className = 'list-item';
-        div.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> ${c.name} ${lockIcon}`;
+        const lockIcon = c.isLocked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#72767d" stroke-width="2" style="margin-left:auto; flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>` : '';
+
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.dataset.targetId = c._id;
+        div.innerHTML = `<span class="channel-hash">#</span> <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</span> ${lockIcon}`;
 
         div.addEventListener('contextmenu', (e) => showContextMenu(e, c._id, 'channel'));
 
         div.onclick = (e) => {
-            if (!isAllowed) return alert("You don't have permission to view this locked channel.");
+            if (!isAllowed) return alert("You don't have the required role to view this locked channel.");
             document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
             e.currentTarget.classList.add('active');
-            selectChat(c._id, `# ${c.name}`, c.topic);
+            selectChat(c._id, c.name, c.topic, "#");
         };
         list.appendChild(div);
 
         if (isAllowed && !firstAllowedChannel) firstAllowedChannel = { c, div };
     });
 
+    applyUnreadBadgesToUI();
+
     if (firstAllowedChannel) {
         firstAllowedChannel.div.classList.add('active');
-        selectChat(firstAllowedChannel.c._id, `# ${firstAllowedChannel.c.name}`, firstAllowedChannel.c.topic);
+        selectChat(firstAllowedChannel.c._id, firstAllowedChannel.c.name, firstAllowedChannel.c.topic, "#");
     } else {
         document.getElementById('current-chat-name').innerText = "No Channels Available";
         document.getElementById('current-chat-topic').innerText = "";
@@ -1139,7 +1490,6 @@ async function loadMembers(serverId) {
     const container = document.getElementById('members-container');
     container.innerHTML = '';
 
-    // Group members by their primary role
     const grouped = {};
     const noRoleMembers = [];
 
@@ -1181,14 +1531,18 @@ async function loadMembers(serverId) {
     renderMemberGroup('Members', null, noRoleMembers);
 }
 
-// --- MESSAGES (ZERO-DELAY OPTIMISTIC UI + 500MS FAST SYNC) ---
-function selectChat(targetId, chatName, topic = "") {
+// --- MESSAGES, TYPING POLLING & @MENTION HIGHLIGHTING ---
+function selectChat(targetId, chatName, topic = "", headerIcon = "#") {
     if (currentTargetId === targetId) return;
 
     currentTargetId = targetId;
     lastRenderedHash = "";
+    document.getElementById('chat-header-icon').innerText = headerIcon;
     document.getElementById('current-chat-name').innerText = chatName;
     document.getElementById('current-chat-topic').innerText = topic;
+    document.getElementById('typing-indicator').classList.add('hidden');
+
+    markTargetAsRead(targetId);
 
     const msgInput = document.getElementById('message-input');
     if (realAdminUser) {
@@ -1196,7 +1550,7 @@ function selectChat(targetId, chatName, topic = "") {
         msgInput.placeholder = "Read-only impersonation mode...";
     } else {
         msgInput.disabled = false;
-        msgInput.placeholder = "Send a message...";
+        msgInput.placeholder = `Message ${headerIcon === '#' ? '#' + chatName : '@' + chatName}`;
     }
     cancelReply();
 
@@ -1204,7 +1558,48 @@ function selectChat(targetId, chatName, topic = "") {
 
     if (messageInterval) clearInterval(messageInterval);
     loadMessages(true);
-    messageInterval = setInterval(() => loadMessages(false), 500);
+    pollTypingUsers();
+    messageInterval = setInterval(() => {
+        loadMessages(false);
+        pollTypingUsers();
+    }, 600);
+}
+
+async function pollTypingUsers() {
+    if (!currentTargetId) return;
+    try {
+        const res = await fetch(`${API_URL}/typing/${currentTargetId}`);
+        if (!res.ok) return;
+        const typers = await res.json();
+        const others = typers.filter(t => t.userId !== currentUser._id);
+        const indicator = document.getElementById('typing-indicator');
+        const textEl = document.getElementById('typing-text');
+
+        if (others.length === 0) {
+            indicator.classList.add('hidden');
+        } else if (others.length === 1) {
+            textEl.innerHTML = `<b>${others[0].username}</b> is typing...`;
+            indicator.classList.remove('hidden');
+        } else if (others.length === 2) {
+            textEl.innerHTML = `<b>${others[0].username}</b> and <b>${others[1].username}</b> are typing...`;
+            indicator.classList.remove('hidden');
+        } else {
+            textEl.innerHTML = `<b>Several people</b> are typing...`;
+            indicator.classList.remove('hidden');
+        }
+    } catch (e) {}
+}
+
+function sendTypingSignal() {
+    if (!currentTargetId || !currentUser || realAdminUser) return;
+    const now = Date.now();
+    if (now - lastTypingSentAt < 2000) return;
+    lastTypingSentAt = now;
+    fetch(`${API_URL}/typing/${currentTargetId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser._id, username: currentUser.username })
+    }).catch(() => {});
 }
 
 function initReply(msgId, username) {
@@ -1216,7 +1611,10 @@ function initReply(msgId, username) {
 }
 function cancelReply() { replyingToId = null; document.getElementById('reply-banner').classList.add('hidden'); }
 
-async function deleteMsg(id) { await fetch(`${API_URL}/messages/${id}`, { method: 'DELETE' }); loadMessages(false); }
+async function deleteMsg(id) {
+    await fetch(`${API_URL}/messages/${id}?userId=${currentUser._id}`, { method: 'DELETE' });
+    loadMessages(false);
+}
 async function editMsg(id) {
     const newContent = prompt("Edit message:");
     if (newContent) {
@@ -1229,9 +1627,16 @@ function buildMessageElement(msg, isOptimistic = false) {
     const author = msg.authorId;
     const time = new Date(msg.timestamp || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+    const myNameEscaped = currentUser.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const meMentionRegex = new RegExp(`@${myNameEscaped}\\b`, 'i');
+    const isMentionedMe = globalConfig.allowMentions !== false && meMentionRegex.test(msg.content);
+
     let safeContent = msg.content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     if (globalConfig.allowMentions !== false) {
-        safeContent = safeContent.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+        safeContent = safeContent.replace(/@(\w+)/g, (full, uname) => {
+            const isMe = uname.toLowerCase() === currentUser.username.toLowerCase();
+            return `<span class="mention ${isMe ? 'me-mention' : ''}">@${uname}</span>`;
+        });
     }
 
     const div = document.createElement('div');
@@ -1243,12 +1648,18 @@ function buildMessageElement(msg, isOptimistic = false) {
         replyHtml = `<div class="reply-context"><img src="${msg.replyTo.authorId.pfp || ''}" style="width:16px;height:16px;border-radius:50%;"><span class="rep-user">@${msg.replyTo.authorId.username}</span> ${msg.replyTo.content.substring(0, 40)}...</div>`;
     }
 
+    const perms = getMyServerPermissions();
+    const canDelete = author._id.toString() === currentUser._id.toString() || currentUser.isAdmin || perms.manageMessages;
+    const canEdit = author._id.toString() === currentUser._id.toString() || currentUser.isAdmin;
+
     let actionHtml = '';
     if (!realAdminUser && !isOptimistic) {
         actionHtml = `<div class="message-actions"><button onclick="initReply('${msg._id}', '${author.username}')" title="Reply"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></button>`;
-        if (author._id.toString() === currentUser._id.toString() || currentUser.isAdmin) {
-            actionHtml += `<button onclick="editMsg('${msg._id}')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
-                           <button class="del" onclick="deleteMsg('${msg._id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
+        if (canEdit) {
+            actionHtml += `<button onclick="editMsg('${msg._id}')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>`;
+        }
+        if (canDelete) {
+            actionHtml += `<button class="del" onclick="deleteMsg('${msg._id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
         }
         actionHtml += `</div>`;
     }
@@ -1257,13 +1668,12 @@ function buildMessageElement(msg, isOptimistic = false) {
     const effDec = getEffectiveDecoration(author);
     const decHtml = effDec ? `<img src="${effDec}" class="avatar-decoration">` : '';
 
-    // Role color on username
     const userRoles = getUserServerRoles(author._id);
     const nameColor = userRoles.length > 0 ? `style="color:${userRoles[0].color};"` : '';
 
     div.innerHTML = `
         ${replyHtml}
-        <div class="message ${msg.isSystem ? 'system-msg' : ''}">
+        <div class="message ${msg.isSystem ? 'system-msg' : ''} ${isMentionedMe ? 'mentioned-msg' : ''}">
             <div class="avatar-wrapper" style="width:40px;height:40px;" onclick="showUserProfile(event, '${author._id}')">
                 <img src="${author.pfp}" class="avatar">
                 ${decHtml}
@@ -1297,6 +1707,8 @@ async function loadMessages(forceScroll = false) {
         if (!forceScroll && currentHash === lastRenderedHash) return;
         lastRenderedHash = currentHash;
 
+        markTargetAsRead(requestedTargetId);
+
         const container = document.getElementById('messages-container');
         const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
 
@@ -1315,7 +1727,7 @@ async function loadMessages(forceScroll = false) {
     }
 }
 
-// EMOJI & MENTION LOGIC
+// EMOJI, TYPING & MENTION LOGIC
 document.getElementById('emoji-btn').addEventListener('click', (e) => {
     e.stopPropagation();
     if (globalConfig.allowEmojis === false) return;
@@ -1329,14 +1741,19 @@ document.querySelector('emoji-picker').addEventListener('emoji-click', event => 
 });
 
 document.getElementById('message-input').addEventListener('input', (e) => {
-    if (globalConfig.allowMentions === false) return;
     const val = e.target.value;
+    if (val.trim().length > 0) {
+        sendTypingSignal();
+    }
+
+    if (globalConfig.allowMentions === false) return;
     const match = val.match(/@(\w*)$/);
     const popup = document.getElementById('mention-suggestions');
 
-    if (match && activeServer) {
+    if (match) {
         const query = match[1].toLowerCase();
-        const filtered = window.currentServerMembers.filter(m => m.username.toLowerCase().startsWith(query));
+        const pool = activeServer ? window.currentServerMembers : Object.values(window.userCache);
+        const filtered = pool.filter(m => m.username && m.username.toLowerCase().startsWith(query));
 
         if (filtered.length > 0) {
             popup.innerHTML = filtered.map(m => `<div class="mention-item" onclick="insertMention('${m.username}')"><img src="${m.pfp}">${m.username}</div>`).join('');
@@ -1367,8 +1784,8 @@ document.getElementById('message-form').addEventListener('submit', async (e) => 
     const replyId = replyingToId;
     input.value = '';
     cancelReply();
+    lastTypingSentAt = 0;
 
-    // 1. Render immediately in DOM (0ms delay)
     const container = document.getElementById('messages-container');
     if (container.innerText === 'Loading messages...') container.innerHTML = '';
     const optimisticEl = buildMessageElement({
@@ -1379,7 +1796,6 @@ document.getElementById('message-form').addEventListener('submit', async (e) => 
     container.appendChild(optimisticEl);
     container.scrollTop = container.scrollHeight;
 
-    // 2. Persist in background
     const res = await fetch(`${API_URL}/messages/${target}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1391,6 +1807,7 @@ document.getElementById('message-form').addEventListener('submit', async (e) => 
         const err = await res.json();
         alert(err.error || "Failed to send message.");
     } else {
+        markTargetAsRead(target);
         loadMessages(true);
     }
 });
@@ -1403,6 +1820,10 @@ async function createServer() { await fetch(`${API_URL}/servers`, { method: 'POS
 
 async function createChannel() {
     const isLocked = document.getElementById('new-channel-locked').checked;
+    const allowedRoles = isLocked
+        ? Array.from(document.querySelectorAll('.new-ch-role-cb:checked')).map(cb => cb.value)
+        : [];
+
     const res = await fetch(`${API_URL}/servers/${activeServer._id}/channels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1410,6 +1831,7 @@ async function createChannel() {
             name: document.getElementById('new-channel-name').value,
             topic: document.getElementById('new-channel-topic').value,
             isLocked: isLocked,
+            allowedRoles: allowedRoles,
             userId: currentUser._id
         })
     });
